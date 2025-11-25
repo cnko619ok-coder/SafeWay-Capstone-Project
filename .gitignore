@@ -1,0 +1,7 @@
+# 백엔드 관련
+/safeway-backend/node_modules
+/safeway-backend/package-lock.json
+
+# 보안상 필수 파일 (절대 공개 금지)
+/safeway-backend/.env
+/safeway-backend/firebase-admin-key.json
