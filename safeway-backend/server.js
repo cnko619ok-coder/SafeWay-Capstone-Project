@@ -32,8 +32,8 @@ app.use(express.json());
 //           미들웨어: 인증 확인
 // =======================================================
 const requireAuth = (req, res, next) => {
-    // 🚨 삭제 요청(DELETE)은 req.query에 uid가 있습니다.
-    const uid = req.body.uid || req.query.uid || req.params.uid; 
+    // 🚨 req.body.uid가 반드시 포함되어 있어야 추가 기능이 작동합니다.
+    const uid = req.body.uid || req.params.uid || req.query.uid; 
     
     if (!uid) {
         return res.status(401).json({ error: '인증 정보(UID)가 필요합니다.' });

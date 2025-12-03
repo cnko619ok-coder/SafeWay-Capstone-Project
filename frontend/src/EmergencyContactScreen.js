@@ -35,11 +35,23 @@ const AddContactModal = ({ isOpen, onClose, onSuccess, userUid }) => {
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     if (!userUid) return alert('❌ 사용자 인증 정보가 없습니다.');
+
     try {
-      await axios.post(`${API_BASE_URL}/api/contacts`, { uid: userUid, ...formData });
-      alert('✅ 연락처 추가 성공');
-      onSuccess(); onClose();
-    } catch (err) { alert(`❌ 추가 실패`); }
+      // ⚡️ 수정된 부분: { uid: userUid, ...formData }
+      // 백엔드로 보낼 때 내 UID를 같이 보내야 401 에러가 안 납니다.
+      await axios.post(`${API_BASE_URL}/api/contacts`, { 
+        uid: userUid, // 👈 여기가 핵심입니다!
+        ...formData 
+      });
+      
+      alert('✅ 연락처가 성공적으로 추가되었습니다.');
+      onSuccess();
+      onClose();
+    } catch (err) {
+      // 에러 처리 코드...
+      const statusCode = err.response ? err.response.status : '네트워크';
+      alert(`❌ 연락처 추가 실패 (${statusCode} 에러)`);
+    }
   };
 
   if (!isOpen) return null;
