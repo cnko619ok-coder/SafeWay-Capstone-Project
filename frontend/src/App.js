@@ -1,13 +1,65 @@
-import MapComponent from './MapComponent';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthScreen } from './AuthScreen';
+import MainScreen from './MainScreen'; // MainScreen.js 파일이 필요합니다.
+import EmergencyContactScreen from './EmergencyContactScreen'; // EmergencyContactScreen.js 파일이 필요합니다.
+import RouteSearchScreen from './RouteSearchScreen'; 
+import RouteResultScreen from './RouteResultScreen';
 
 function App() {
-  return (
-    <div className="flex flex-col items-center justify-center p-4">
-      <h1 className="text-3xl font-bold text-gray-800 mb-4">SafeWay 지도 테스트</h1>
-      <MapComponent />
-      <p className="mt-4">지도가 보이면 성공입니다.</p>
-    </div>
-  );
+    // 로그인 상태와 사용자 UID를 저장할 상태
+    const [isLoggedIn, setIsLoggedIn] = useState(false); 
+    const [userUid, setUserUid] = useState(null); 
+
+    // AuthScreen에서 로그인 성공 시 호출될 함수
+    const handleLoginSuccess = (uid) => {
+        setUserUid(uid); // UID 저장
+        setIsLoggedIn(true); // 로그인 상태를 true로 변경
+    };
+
+    return (
+        <Router>
+            <Routes>
+                {/* 로그인 화면: 로그인 상태가 아니면 AuthScreen 표시 */}
+                <Route 
+                    path="/login" 
+                    element={isLoggedIn ? <Navigate to="/" /> : <AuthScreen onLoginSuccess={handleLoginSuccess} />} 
+                />
+                
+                {/* 메인 화면: 로그인 상태가 아니면 /login으로 리다이렉트 */}
+                <Route 
+                    path="/" 
+                    element={isLoggedIn ? <MainScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                />
+                
+                {/* 긴급 연락처 화면: 로그인 상태일 때만 접근 가능 */}
+                <Route 
+                    path="/contacts" 
+                    element={isLoggedIn ? <EmergencyContactScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                />
+                {/* 🚨🚨🚨 경로 검색 라우트 추가 */}
+                <Route 
+                  path="/route/search" 
+                  element={isLoggedIn ? <RouteSearchScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                />
+        
+                {/* 🚨🚨🚨 경로 결과 라우트 추가 */}
+                <Route 
+                  path="/route/result" 
+                  element={isLoggedIn ? <RouteResultScreen /> : <Navigate to="/login" />} 
+                />
+                
+                {/* 위험 지역 게시판 임시 라우트 추가 */}
+                <Route 
+                    path="/report-board" 
+                    element={isLoggedIn ? <div>위험 지역 신고 게시판 UI (구현 예정)</div> : <Navigate to="/login" />} 
+                />
+                
+                {/* 기본 접속 시 /login으로 이동 */}
+                <Route path="*" element={<Navigate to="/login" />} />
+            </Routes>
+        </Router>
+    );
 }
 
 export default App;
