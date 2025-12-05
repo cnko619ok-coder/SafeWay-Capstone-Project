@@ -5,6 +5,9 @@ import MainScreen from './MainScreen'; // MainScreen.js 파일이 필요합니�
 import EmergencyContactScreen from './EmergencyContactScreen'; // EmergencyContactScreen.js 파일이 필요합니다.
 import RouteSearchScreen from './RouteSearchScreen'; 
 import RouteResultScreen from './RouteResultScreen';
+import axios from 'axios'; // 🚨 axios import 확인
+
+axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'any';
 
 function App() {
     // 로그인 상태와 사용자 UID를 저장할 상태
