@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Search, MapPin, ArrowLeft, Map as MapIcon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const API_BASE_URL = 'http://localhost:3005';
+const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
 
 // 🚨 로컬 환경 백업용 가상 경로
 const DUMMY_PATH = [
