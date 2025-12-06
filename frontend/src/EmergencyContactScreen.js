@@ -5,7 +5,7 @@ import axios from 'axios';
 import { ChevronLeft, Trash2, Plus, Users, AlertTriangle, X } from 'lucide-react';
 import { Link } from 'react-router-dom'; 
 
-const API_BASE_URL = 'http://localhost:3005'; 
+const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
 
 const ContactItem = ({ contact, onDelete }) => (
   <div className="flex items-center justify-between p-4 bg-white border-b hover:bg-gray-50 transition-colors">

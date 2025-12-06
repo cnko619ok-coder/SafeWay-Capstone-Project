@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Shield } from 'lucide-react'; 
 import axios from 'axios'; 
 
-const API_BASE_URL = 'http://localhost:3005';
+const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
 
 // 🚨 onLoginSuccess prop을 받도록 수정되었습니다.
 export function AuthScreen({ onLoginSuccess }) { 

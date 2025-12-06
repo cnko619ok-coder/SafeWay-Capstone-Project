@@ -25,8 +25,16 @@ const SEOUL_CCTV_KEY = process.env.SEOUL_CCTV_KEY;
 const CCTV_API_SERVICE = 'safeOpenCCTV'; 
 const SEOUL_CCTV_BASE_URL = 'http://openapi.seoul.go.kr:8088/';
 
-app.use(cors());
 app.use(express.json());
+
+// 🚨🚨🚨 CORS 설정 강화 (수정된 부분) 🚨🚨🚨
+// 프론트엔드(Vercel)에서 오는 요청과 ngrok 헤더를 허용합니다.
+app.use(cors({
+    origin: true, // 모든 도메인에서의 요청 허용 (Vercel 포함)
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'] // 🚨 ngrok 헤더 허용 필수
+}));
 
 // =======================================================
 //           미들웨어: 인증 확인
