@@ -1,39 +1,117 @@
-import React from 'react';
+// frontend/src/RouteResultScreen.js
+
+import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
+import { Shield, Clock, MapPin, Navigation } from 'lucide-react';
+import { Map, MapMarker, Polyline } from 'react-kakao-maps-sdk'; // 🚨 지도 패키지 추가
+
+// 🚨 JavaScript 키 (MapComponent와 동일)
+const KAKAO_APP_KEY = '15b6d60e4095cdc453d99c4883ad6e6d'; 
 
 export default function RouteResultScreen() {
     const location = useLocation();
     const { routeData, searchData } = location.state || {};
     
+    // 1. 경로 데이터가 없을 때 (예외 처리)
     if (!routeData) {
         return (
-            <div className="p-8 text-center">
-                <p>경로 데이터가 없습니다. <Link to="/" className="text-blue-500">홈으로 돌아가기</Link></p>
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
+                <p className="text-gray-600 mb-4">경로 데이터가 없습니다.</p>
+                <Link to="/" className="text-blue-600 font-bold underline">홈으로 돌아가기</Link>
             </div>
         );
     }
 
-    // 백엔드에서 받은 안전 점수
-    const finalScore = routeData.safety.score;
+    const { safety, shortest } = routeData;
+    
+    // 2. 지도에 그릴 경로 좌표 (기본값: 서울 시청 근처 더미 데이터)
+    // 실제로는 백엔드에서 pathPoints를 받아와야 하지만, 지금은 시각화를 위해 고정값을 사용하거나
+    // RouteSearchScreen에서 넘겨준 값을 사용해야 합니다.
+    const pathCoordinates = [
+        { lat: 37.5668, lng: 126.9790 }, // 출발 (예시)
+        { lat: 37.5670, lng: 126.9792 }, // 중간
+        { lat: 37.5672, lng: 126.9794 }, // 도착 (예시)
+    ];
 
     return (
-        <div className="min-h-screen p-4 bg-white">
-            <h1 className="text-2xl font-bold mb-4">경로 결과 확인</h1>
-            <p className="text-gray-600 mb-6">출발: {searchData.start} / 도착: {searchData.end}</p>
+        <div className="min-h-screen bg-gray-50 flex flex-col relative">
             
-            <div className="bg-green-100 p-6 rounded-xl shadow-lg">
-                <h2 className="text-xl font-semibold text-green-700">안전 경로 추천 점수: {finalScore}점</h2>
-                <p className="mt-2 text-green-600">이 점수를 기반으로 상세 경로를 선택할 수 있습니다.</p>
+            {/* 🚨 3. 지도 영역 (화면 상단 45% 차지) */}
+            <div className="w-full h-[45vh] relative z-0">
+                <Map
+                    center={pathCoordinates[0]} // 출발지를 중심으로
+                    style={{ width: "100%", height: "100%" }}
+                    level={3}
+                    appkey={KAKAO_APP_KEY} // 🚨 키 필수!
+                >
+                    {/* 출발지 마커 */}
+                    <MapMarker position={pathCoordinates[0]} />
+                    
+                    {/* 도착지 마커 */}
+                    <MapMarker position={pathCoordinates[pathCoordinates.length - 1]} />
+
+                    {/* 경로 선 그리기 */}
+                    <Polyline
+                        path={[pathCoordinates]}
+                        strokeWeight={5}
+                        strokeColor={"#3b82f6"}
+                        strokeOpacity={0.8}
+                        strokeStyle={"solid"}
+                    />
+                </Map>
+
+                {/* 뒤로가기 버튼 (지도 위에 띄움) */}
+                <Link to="/route/search" className="absolute top-4 left-4 z-10 bg-white p-2 rounded-full shadow-lg text-gray-700">
+                    <Navigation className="w-6 h-6 transform rotate-180" />
+                </Link>
             </div>
 
-            {/* 다음 단계에서 상세 비교 UI를 구현할 영역입니다. */}
-            <div className="mt-8">
-                <h3 className="font-semibold text-lg mb-3">경로 옵션</h3>
-                <p>안전 경로: {routeData.safety.distance} / {routeData.safety.time} (CCTV: {routeData.safety.cctv}개)</p>
-                <p>최단 경로: {routeData.shortest.distance} / {routeData.shortest.time} (CCTV: {routeData.shortest.cctv}개)</p>
+            {/* 4. 결과 정보 영역 (화면 하단, 둥근 모서리 디자인) */}
+            <div className="flex-grow bg-white rounded-t-3xl -mt-6 z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] p-6 flex flex-col">
+                
+                {/* 핸들바 장식 */}
+                <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6"></div>
+
+                <div className="mb-6">
+                    <h1 className="text-2xl font-bold text-gray-800">경로 분석 완료</h1>
+                    <p className="text-sm text-gray-500 mt-1 flex items-center">
+                        {searchData.start} <span className="mx-2">➔</span> {searchData.end}
+                    </p>
+                </div>
+
+                {/* 안전 경로 카드 (메인) */}
+                <div className="bg-green-50 border border-green-100 p-5 rounded-2xl mb-4 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 bg-green-500 text-white text-xs px-3 py-1 rounded-bl-xl font-bold">
+                        추천
+                    </div>
+                    <div className="flex items-center mb-3 text-green-700 font-bold">
+                        <Shield className="w-5 h-5 mr-2" /> 안전 경로
+                    </div>
+                    <div className="flex items-end mb-4">
+                        <span className="text-5xl font-extrabold text-green-600">{safety.score}</span>
+                        <span className="text-gray-500 ml-1 mb-1 font-medium">점</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-gray-600">
+                        <div className="flex items-center"><Clock className="w-4 h-4 mr-1"/> {safety.time}</div>
+                        <div className="flex items-center"><MapPin className="w-4 h-4 mr-1"/> {safety.distance}</div>
+                    </div>
+                </div>
+
+                {/* 최단 경로 정보 (간략) */}
+                <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
+                    <div>
+                        <p className="text-xs text-gray-500 font-medium">최단 경로 (비교)</p>
+                        <p className="text-gray-800 font-bold mt-1">{shortest.time} / {shortest.distance}</p>
+                    </div>
+                    <div className="text-xl font-bold text-yellow-500">{shortest.score}점</div>
+                </div>
+
+                <div className="mt-auto pt-6">
+                    <Link to="/" className="block w-full bg-gray-900 text-white text-center py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-transform">
+                        홈으로 돌아가기
+                    </Link>
+                </div>
             </div>
-            
-            <Link to="/" className="mt-8 block text-center text-blue-500">홈으로 돌아가기</Link>
         </div>
     );
 }
