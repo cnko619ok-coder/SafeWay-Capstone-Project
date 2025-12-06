@@ -88,13 +88,26 @@ export default function RouteSearchScreen({ userUid }) {
                 pathPoints: pathPoints,
             });
             
-            const finalSafetyScore = response.data.safetyScore; 
+            const { safetyScore, cctvCount, lightCount } = response.data; 
 
-            // 3. 결과 화면으로 이동
+            // 3. 결과 화면으로 이동하며 데이터 전달
             navigate('/route/result', { 
                 state: { 
                     searchData: { start: startLocation, end: endLocation },
-                    routeData: { ...DUMMY_ROUTE_DATA, safety: { ...DUMMY_ROUTE_DATA.safety, score: finalSafetyScore } }
+                    routeData: { 
+                        ...DUMMY_ROUTE_DATA, 
+                        safety: { 
+                            ...DUMMY_ROUTE_DATA.safety, 
+                            score: safetyScore,   // 받은 점수
+                            cctv: cctvCount,      // 👈 받은 CCTV 개수
+                            lights: lightCount,   // 👈 받은 가로등 개수
+                            // 거리/시간은 지도 API가 없어서 계산 불가하므로 임시 값 유지
+                            distance: '약 1km', 
+                            time: '약 15분' 
+                        },
+                        // 최단 경로는 비교용 가상 데이터 유지
+                        shortest: { ...DUMMY_ROUTE_DATA.shortest, score: 70, cctv: Math.floor(cctvCount / 2), lights: Math.floor(lightCount / 2) }
+                    }
                 } 
             });
 

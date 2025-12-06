@@ -36,6 +36,29 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'] // 🚨 ngrok 헤더 허용 필수
 }));
 
+//가로등 데이터를 메모리에 저장할 변수
+let cachedStreetlights = [];
+
+// 🚨🚨🚨 [추가] 서버 시작 시 가로등 데이터를 한 번만 불러오는 함수
+async function loadStreetlightsData() {
+    try {
+        console.log("📡 가로등 데이터 로딩 시작...");
+        const snapshot = await db.collection('streetlights').get();
+        if (snapshot.empty) {
+            console.log("⚠️ 가로등 데이터가 비어있습니다.");
+            return;
+        }
+        // 데이터를 메모리 변수에 저장
+        cachedStreetlights = snapshot.docs.map(doc => doc.data());
+        console.log(`✅ 가로등 데이터 ${cachedStreetlights.length}개 로드 완료! (메모리 캐시)`);
+    } catch (error) {
+        console.error("❌ 가로등 데이터 로드 실패:", error.message);
+    }
+}
+
+// 서버 시작 시 바로 실행
+loadStreetlightsData();
+
 // =======================================================
 //           미들웨어: 인증 확인
 // =======================================================
@@ -98,24 +121,75 @@ async function getCCTVData() {
         return response.data[CCTV_API_SERVICE]?.row || [];
     } catch (error) { return []; }
 }
+// safeway-backend/server.js (안전 점수 계산 API 부분 수정)
+
 app.post('/api/route/safety', async (req, res) => {
     const { pathPoints } = req.body; 
-    if (!pathPoints || pathPoints.length < 2) return res.status(400).json({ error: '좌표 필요' });
+    if (!pathPoints || pathPoints.length < 2) {
+        return res.status(400).json({ error: '유효한 경로 좌표가 필요합니다.' });
+    }
+
+    // 🚨 수정 1: 검색 반경을 50m -> 1000m (1km)로 늘려서 데이터를 확실히 잡도록 함
+    const radius = 1000; 
+    let totalSafetyScore = 0;
+    
     try {
-        const lightsSnapshot = await db.collection('streetlights').get();
-        const streetlights = lightsSnapshot.docs.map(doc => doc.data());
+        // 1. 전체 데이터 로드
+        const streetlights = cachedStreetlights;
+
+        if (streetlights.length === 0) {
+            console.warn("⚠️ 가로등 데이터가 없습니다. (아직 로딩 중이거나 DB 비어있음)");
+        }
+
         const cctvData = await getCCTVData(); 
-        let totalSafetyScore = 0; const radius = 50;
+
+        // 🚨 수정 2: 로드된 전체 데이터 개수 확인 로그
+        console.log(`[데이터 로드] 가로등: ${streetlights.length}개, CCTV: ${cctvData.length}개`);
+
+        let totalLightsFound = 0;
+        let totalCCTVsFound = 0;
+
         pathPoints.forEach(point => {
-            const nearbyLights = streetlights.filter(light => calculateDistance(point.lat, point.lng, light.lat, light.lng) <= radius).length;
-            const nearbyCCTVs = cctvData.filter(cctv => calculateDistance(point.lat, point.lng, cctv.WGSXPT, cctv.WGSYPT) <= radius).length;
+            
+            // a) 가로등 밀도 계산
+            const nearbyLights = streetlights.filter(light => {
+                const distance = calculateDistance(point.lat, point.lng, light.lat, light.lng);
+                return distance <= radius;
+            }).length;
+            
+            // b) CCTV 밀도 계산
+            const nearbyCCTVs = cctvData.filter(cctv => {
+                // 필드명 WGSXPT, WGSYPT 사용
+                const distance = calculateDistance(point.lat, point.lng, cctv.WGSXPT, cctv.WGSYPT); 
+                return distance <= radius;
+            }).length;
+
+            totalLightsFound += nearbyLights;
+            totalCCTVsFound += nearbyCCTVs;
+
+            // 가중치 점수 합산
             totalSafetyScore += (nearbyCCTVs * 5) + (nearbyLights * 2);
         });
-        const finalScore = Math.min(100, Math.round((totalSafetyScore / (pathPoints.length * 7)) * 100));
-        res.status(200).json({ safetyScore: finalScore, message: '계산 완료' });
-    } catch (error) { res.status(500).json({ error: '분석 오류' }); }
-});
 
+        // 🚨 수정 3: 실제로 찾은 개수 로그 출력
+        console.log(`[분석 결과] 반경 ${radius}m 내 발견 - 가로등: ${totalLightsFound}개, CCTV: ${totalCCTVsFound}개`);
+
+        // 4. 최종 점수 정규화 (간단하게 100점 만점 환산)
+        // 점수가 너무 크면 100점으로 고정
+        const finalScore = Math.min(100, Math.round((totalSafetyScore / maxScorePossible) * 100));
+
+        res.status(200).json({ 
+            safetyScore: finalScore, 
+            cctvCount: totalCCTVsFound,   // 👈 추가됨
+            lightCount: totalLightsFound,
+            message: '안전 점수 계산 완료' 
+        });
+
+    } catch (error) {
+        console.error('안전 경로 계산 오류:', error);
+        res.status(500).json({ error: '경로 분석 중 오류가 발생했습니다.' });
+    }
+});
 // =======================================================
 //           C. 긴급 연락처 관리 API
 // =======================================================
