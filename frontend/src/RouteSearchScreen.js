@@ -2,12 +2,13 @@
 
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Search, MapPin, ArrowLeft, Map as MapIcon } from 'lucide-react';
+import { Search, MapPin, ArrowLeft, Navigation, Clock, Map as MapIcon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
+// 🚨 ngrok 주소 유지 (바뀌었다면 수정 필요)
+const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
 
-// 🚨 로컬 환경 백업용 가상 경로
+// 로컬 환경 백업용 가상 경로
 const DUMMY_PATH = [
   { lat: 37.5668, lng: 126.9790 }, 
   { lat: 37.5670, lng: 126.9792 },
@@ -21,31 +22,27 @@ const DUMMY_ROUTE_DATA = {
     balanced: { score: 0, distance: '...', time: '...', cctv: 0, lights: 0 },
 };
 
-
-export default function RouteSearchScreen({ userUid }) {
+export default function RouteSearchScreen() {
     const [startLocation, setStartLocation] = useState('');
     const [endLocation, setEndLocation] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const navigate = useNavigate(); 
 
-    // 🚨 주소를 좌표로 변환하는 함수 (Geocoding)
+    // 주소를 좌표로 변환하는 함수 (Geocoding)
     const searchAddressToCoordinate = (address) => {
         return new Promise((resolve, reject) => {
-            // 카카오 SDK가 로드되었는지 확인
             if (!window.kakao || !window.kakao.maps || !window.kakao.maps.services) {
                 reject(new Error("Kakao Maps SDK가 로드되지 않았습니다."));
                 return;
             }
-
             const geocoder = new window.kakao.maps.services.Geocoder();
             geocoder.addressSearch(address, (result, status) => {
                 if (status === window.kakao.maps.services.Status.OK) {
-                    const coords = {
+                    resolve({
                         lat: parseFloat(result[0].y),
                         lng: parseFloat(result[0].x),
-                    };
-                    resolve(coords);
+                    });
                 } else {
                     reject(new Error(`주소 검색 실패: ${address}`));
                 }
@@ -58,7 +55,7 @@ export default function RouteSearchScreen({ userUid }) {
         setLoading(true);
         setError(null);
 
-        let pathPoints = DUMMY_PATH;
+        let pathPoints = [];
 
         try {
             // 1. 실제 주소 좌표 변환 시도 (Vercel 환경용)
@@ -66,8 +63,6 @@ export default function RouteSearchScreen({ userUid }) {
                 const startCoords = await searchAddressToCoordinate(startLocation);
                 const endCoords = await searchAddressToCoordinate(endLocation);
                 
-                // 실제 좌표가 구해지면 경로 포인트로 설정 (직선 경로 가정)
-                // 실제로는 경로 탐색 API를 써야 하지만, 여기서는 시작-중간-끝 점으로 시뮬레이션
                 pathPoints = [
                     startCoords,
                     { lat: (startCoords.lat + endCoords.lat) / 2, lng: (startCoords.lng + endCoords.lng) / 2 }, 
@@ -76,11 +71,11 @@ export default function RouteSearchScreen({ userUid }) {
                 console.log("📍 실제 주소 좌표 변환 성공:", pathPoints);
 
             } catch (geoError) {
-                console.warn("⚠️ 지도 API 사용 불가 (로컬 환경). 가상 데이터 사용:", geoError.message);
-                // 로컬 등 API 사용 불가 시 가상 데이터 사용
+                console.warn("⚠️ 지도 API 사용 불가 (로컬 환경). 가상 데이터 사용");
                 pathPoints = DUMMY_PATH;
-                if (startLocation === '') setStartLocation('서울 시청 (가상)');
-                if (endLocation === '') setEndLocation('우리집 (가상)');
+                // 로컬 테스트를 위해 빈 값이면 기본값 채움
+                if (startLocation === '') setStartLocation('서울 시청');
+                if (endLocation === '') setEndLocation('강남역');
             }
             
             // 2. 백엔드 안전 점수 계산 API 호출
@@ -88,108 +83,137 @@ export default function RouteSearchScreen({ userUid }) {
                 pathPoints: pathPoints,
             });
             
-            const { safetyScore, cctvCount, lightCount } = response.data; 
+            const { safetyScore, cctvCount, lightCount } = response.data;
 
-            // 3. 결과 화면으로 이동하며 데이터 전달
+            // 3. 결과 화면으로 이동
             navigate('/route/result', { 
                 state: { 
-                    searchData: { start: startLocation, end: endLocation },
+                    searchData: { start: startLocation || '서울 시청', end: endLocation || '강남역' },
                     routeData: { 
                         ...DUMMY_ROUTE_DATA, 
                         safety: { 
                             ...DUMMY_ROUTE_DATA.safety, 
-                            score: safetyScore,   // 받은 점수
-                            cctv: cctvCount,      // 👈 받은 CCTV 개수
-                            lights: lightCount,   // 👈 받은 가로등 개수
-                            // 거리/시간은 지도 API가 없어서 계산 불가하므로 임시 값 유지
-                            distance: '약 1km', 
-                            time: '약 15분' 
+                            score: safetyScore, 
+                            cctv: cctvCount, 
+                            lights: lightCount,
+                            distance: '2.3 km', time: '18분' 
                         },
-                        // 최단 경로는 비교용 가상 데이터 유지
-                        shortest: { ...DUMMY_ROUTE_DATA.shortest, score: 70, cctv: Math.floor(cctvCount / 2), lights: Math.floor(lightCount / 2) }
+                        shortest: { ...DUMMY_ROUTE_DATA.shortest, score: 72, cctv: Math.floor(cctvCount * 0.6), lights: Math.floor(lightCount * 0.5), distance: '1.8 km', time: '12분' }
                     }
                 } 
             });
 
         } catch (err) {
-            console.error('경로 검색 API 호출 실패:', err);
-            setError('경로 검색에 실패했습니다. 백엔드 서버 상태를 확인하세요.');
+            console.error(err);
+            setError('경로 검색 실패. 서버 상태를 확인하세요.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
             
-            {/* 헤더 */}
-            <header className="bg-white p-4 border-b shadow-sm flex items-center">
-                <Link to="/" className="text-gray-600 hover:text-gray-800 mr-4">
+            {/* 1. 상단 네비게이션 */}
+            <header className="bg-white p-4 flex items-center justify-between sticky top-0 z-10">
+                <Link to="/" className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full transition">
                     <ArrowLeft className="w-6 h-6" />
                 </Link>
-                <h1 className="text-xl font-semibold text-gray-800">경로 검색</h1>
+                <h1 className="text-lg font-bold text-gray-800">경로 검색</h1>
+                <div className="w-8"></div> {/* 중앙 정렬을 위한 빈 공간 */}
             </header>
 
-            <main className="p-4 space-y-6 flex-grow">
+            <main className="flex-grow p-5 space-y-6">
                 
-                <p className="text-gray-600 text-sm">
-                    {!window.kakao ? "⚠️ 로컬 환경: 가상 경로 검색 모드" : "안전한 귀가 경로를 찾아드립니다"}
-                </p>
+                {/* 2. 안내 멘트 */}
+                <div>
+                    <h2 className="text-xl font-bold text-gray-800">안전한 경로를 <br/>찾아드립니다</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                        {!window.kakao ? "⚠️ 로컬 환경: 가상 경로 모드" : "목적지를 입력해주세요"}
+                    </p>
+                </div>
 
-                {/* 1. 입력 필드 */}
-                <form onSubmit={handleSearch} className="space-y-4 bg-white p-4 rounded-xl shadow-md">
-                    <div className="relative">
-                        <MapPin className="w-5 h-5 text-blue-500 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                {/* 3. 검색 입력 폼 (카드 형태) */}
+                <form onSubmit={handleSearch} className="bg-white p-5 rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] space-y-4">
+                    
+                    {/* 출발지 입력 */}
+                    <div className="relative group">
+                        <div className="absolute left-4 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-blue-500 rounded-full ring-4 ring-blue-100"></div>
                         <input
                             type="text"
                             placeholder="출발지 입력"
                             value={startLocation}
                             onChange={(e) => setStartLocation(e.target.value)}
-                            required
-                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full pl-10 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-800 placeholder-gray-400 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all outline-none"
                         />
+                        {/* 현위치 아이콘 */}
+                        <button type="button" className="absolute right-4 top-1/2 transform -translate-y-1/2 text-blue-500 p-1 bg-white rounded-lg shadow-sm border border-gray-100">
+                            <Navigation className="w-4 h-4" />
+                        </button>
                     </div>
-                    <div className="relative">
-                        <MapPin className="w-5 h-5 text-red-500 absolute left-3 top-1/2 transform -translate-y-1/2" />
+
+                    {/* 도착지 입력 */}
+                    <div className="relative group">
+                        <div className="absolute left-4 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-red-500 rounded-full ring-4 ring-red-100"></div>
                         <input
                             type="text"
-                            placeholder="도착지 입력 (우리집)"
+                            placeholder="도착지 입력"
                             value={endLocation}
                             onChange={(e) => setEndLocation(e.target.value)}
-                            required
-                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full pl-10 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-800 placeholder-gray-400 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-50 transition-all outline-none"
                         />
                     </div>
 
-                    {/* 경로 검색 버튼 */}
+                    {/* 검색 버튼 */}
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                        className="w-full mt-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200 hover:shadow-xl hover:from-blue-700 hover:to-blue-600 transition-all transform active:scale-95 flex items-center justify-center"
                     >
-                        {loading ? '검색 중...' : (<><Search className="w-5 h-5" /><span>경로 검색</span></>)}
+                        {loading ? (
+                            <span className="flex items-center"><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>분석 중...</span>
+                        ) : (
+                            <>
+                                <Search className="w-5 h-5 mr-2" />
+                                <span>경로 검색</span>
+                            </>
+                        )}
                     </button>
-                    {error && <p className="text-sm text-red-500 text-center mt-2">{error}</p>}
+                    {error && <p className="text-xs text-red-500 text-center mt-2">{error}</p>}
                 </form>
 
-                {/* 2. 최근 목적지 */}
+                {/* 4. 최근 목적지 */}
                 <section>
-                    <h2 className="text-md font-semibold text-gray-700 mb-2">최근 목적지</h2>
-                    <div className="space-y-2">
-                        {['우리집', '회사', '지하철역'].map(dest => (
+                    <div className="flex items-center justify-between mb-3 px-1">
+                        <h3 className="text-sm font-bold text-gray-700">최근 목적지</h3>
+                        <button type="button" className="text-xs text-gray-400 hover:text-gray-600">편집</button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                        {[
+                            { name: '우리집', icon: 'home', address: '서울시 강남구 역삼동' },
+                            { name: '회사', icon: 'briefcase', address: '서울시 중구 태평로' },
+                            { name: '지하철역', icon: 'train', address: '강남역 2호선' }
+                        ].map((dest, idx) => (
                             <button
-                                key={dest}
-                                onClick={() => setEndLocation(dest)}
-                                className="w-full text-left p-3 bg-white border rounded-lg shadow-sm hover:bg-gray-100 transition-colors flex items-center space-x-3"
+                                key={idx}
+                                type="button"
+                                onClick={() => setEndLocation(dest.name)}
+                                className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all flex items-center group"
                             >
-                                {/* 🚨 MapIcon 사용 */}
-                                <MapIcon className="w-5 h-5 text-gray-400" />
-                                <span>{dest}</span>
+                                <div className="bg-gray-50 p-3 rounded-xl text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
+                                    {dest.icon === 'home' ? <MapIcon className="w-5 h-5" /> : 
+                                     dest.icon === 'briefcase' ? <MapIcon className="w-5 h-5" /> : 
+                                     <Navigation className="w-5 h-5" />}
+                                </div>
+                                <div className="ml-4 text-left">
+                                    <p className="font-bold text-gray-800">{dest.name}</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">{dest.address}</p>
+                                </div>
                             </button>
                         ))}
                     </div>
                 </section>
-                
             </main>
         </div>
     );
