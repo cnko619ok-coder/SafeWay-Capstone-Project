@@ -58,7 +58,7 @@ export default function RouteSearchScreen({ userUid }) {
         setLoading(true);
         setError(null);
 
-        let pathPoints = [];
+        let pathPoints = DUMMY_PATH;
 
         try {
             // 1. 실제 주소 좌표 변환 시도 (Vercel 환경용)

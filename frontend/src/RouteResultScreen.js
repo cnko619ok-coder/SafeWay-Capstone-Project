@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Shield, Clock, MapPin, Navigation } from 'lucide-react';
-import { Map, MapMarker, Polyline } from 'react-kakao-maps-sdk'; // 🚨 지도 패키지 추가
+import { Shield, Clock, MapPin, Navigation, Camera, Lightbulb } from 'lucide-react';
+import { Map, MapMarker, Polyline } from 'react-kakao-maps-sdk'; // 🚨 지도 라이브러리 추가
 
 // 🚨 JavaScript 키 (MapComponent와 동일)
 const KAKAO_APP_KEY = '15b6d60e4095cdc453d99c4883ad6e6d'; 
@@ -12,7 +12,7 @@ export default function RouteResultScreen() {
     const location = useLocation();
     const { routeData, searchData } = location.state || {};
     
-    // 1. 경로 데이터가 없을 때 (예외 처리)
+    // 1. 데이터가 없을 때 예외 처리
     if (!routeData) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
@@ -24,13 +24,12 @@ export default function RouteResultScreen() {
 
     const { safety, shortest } = routeData;
     
-    // 2. 지도에 그릴 경로 좌표 (기본값: 서울 시청 근처 더미 데이터)
-    // 실제로는 백엔드에서 pathPoints를 받아와야 하지만, 지금은 시각화를 위해 고정값을 사용하거나
-    // RouteSearchScreen에서 넘겨준 값을 사용해야 합니다.
+    // 2. 지도에 그릴 경로 좌표 (현재는 가상 경로 사용)
+    // 실제로는 백엔드에서 받은 경로 데이터를 사용해야 하지만, 시각화를 위해 고정된 좌표를 사용합니다.
     const pathCoordinates = [
-        { lat: 37.5668, lng: 126.9790 }, // 출발 (예시)
+        { lat: 37.5668, lng: 126.9790 }, // 출발
         { lat: 37.5670, lng: 126.9792 }, // 중간
-        { lat: 37.5672, lng: 126.9794 }, // 도착 (예시)
+        { lat: 37.5672, lng: 126.9794 }, // 도착
     ];
 
     return (
@@ -42,7 +41,7 @@ export default function RouteResultScreen() {
                     center={pathCoordinates[0]} // 출발지를 중심으로
                     style={{ width: "100%", height: "100%" }}
                     level={3}
-                    appkey={KAKAO_APP_KEY} // 🚨 키 필수!
+                    appkey={KAKAO_APP_KEY}
                 >
                     {/* 출발지 마커 */}
                     <MapMarker position={pathCoordinates[0]} />
@@ -50,7 +49,7 @@ export default function RouteResultScreen() {
                     {/* 도착지 마커 */}
                     <MapMarker position={pathCoordinates[pathCoordinates.length - 1]} />
 
-                    {/* 경로 선 그리기 */}
+                    {/* 경로 선 그리기 (파란색) */}
                     <Polyline
                         path={[pathCoordinates]}
                         strokeWeight={5}
@@ -91,19 +90,18 @@ export default function RouteResultScreen() {
                         <span className="text-5xl font-extrabold text-green-600">{safety.score}</span>
                         <span className="text-gray-500 ml-1 mb-1 font-medium">점</span>
                     </div>
-                    <div className="flex justify-between text-sm text-gray-600">
-                        <div className="flex items-center"><Clock className="w-4 h-4 mr-1"/> {safety.time}</div>
-                        <div className="flex items-center"><MapPin className="w-4 h-4 mr-1"/> {safety.distance}</div>
+                    
+                    {/* 데이터 표시 */}
+                    <div className="grid grid-cols-2 gap-3 text-sm text-gray-700">
+                        <div className="flex items-center space-x-2 bg-white p-2 rounded-lg shadow-sm">
+                            <Camera className="w-4 h-4 text-blue-500" />
+                            <span>CCTV <strong className="text-blue-600">{safety.cctv}개</strong></span>
+                        </div>
+                        <div className="flex items-center space-x-2 bg-white p-2 rounded-lg shadow-sm">
+                            <Lightbulb className="w-4 h-4 text-yellow-500" />
+                            <span>가로등 <strong className="text-yellow-600">{safety.lights}개</strong></span>
+                        </div>
                     </div>
-                </div>
-
-                {/* 최단 경로 정보 (간략) */}
-                <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
-                    <div>
-                        <p className="text-xs text-gray-500 font-medium">최단 경로 (비교)</p>
-                        <p className="text-gray-800 font-bold mt-1">{shortest.time} / {shortest.distance}</p>
-                    </div>
-                    <div className="text-xl font-bold text-yellow-500">{shortest.score}점</div>
                 </div>
 
                 <div className="mt-auto pt-6">

@@ -176,7 +176,8 @@ app.post('/api/route/safety', async (req, res) => {
 
         // 4. 최종 점수 정규화 (간단하게 100점 만점 환산)
         // 점수가 너무 크면 100점으로 고정
-        const finalScore = Math.min(100, Math.round((totalSafetyScore / maxScorePossible) * 100));
+        let finalScore = 60 + (totalCCTVsFound * 3) + (totalLightsFound * 1);
+        finalScore = Math.min(100, finalScore); // 100점을 넘지 않도록 제한
 
         res.status(200).json({ 
             safetyScore: finalScore, 
