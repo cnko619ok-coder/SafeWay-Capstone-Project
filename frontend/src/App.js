@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useKakaoLoader } from 'react-kakao-maps-sdk'; // 🚨 Loader 임포트
 import { AuthScreen } from './AuthScreen';
 import MainScreen from './MainScreen'; // MainScreen.js 파일이 필요합니다.
 import EmergencyContactScreen from './EmergencyContactScreen'; // EmergencyContactScreen.js 파일이 필요합니다.
@@ -14,11 +15,21 @@ function App() {
     const [isLoggedIn, setIsLoggedIn] = useState(false); 
     const [userUid, setUserUid] = useState(null); 
 
+    // 🚨🚨🚨 [핵심 수정] 지도 SDK와 'services' 라이브러리를 여기서 미리 로드합니다.
+    useKakaoLoader({
+      appkey: "15b6d60e4095cdc453d99c4883ad6e6d",
+      libraries: ["services", "clusterer", "drawing"], // 주소 검색에 필수!
+    });
+
     // AuthScreen에서 로그인 성공 시 호출될 함수
     const handleLoginSuccess = (uid) => {
         setUserUid(uid); // UID 저장
         setIsLoggedIn(true); // 로그인 상태를 true로 변경
     };
+
+    if (!isLoggedIn && window.location.pathname !== '/login') {
+      // (선택 사항) 로딩 중 처리 등을 할 수 있습니다.
+    }
 
     return (
         <Router>
