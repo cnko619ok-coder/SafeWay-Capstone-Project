@@ -1,7 +1,7 @@
 // frontend/src/SOSScreen.js
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Phone, AlertTriangle, X } from 'lucide-react';
+import { ArrowLeft, Phone, AlertTriangle, X, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function SOSScreen() {
@@ -9,14 +9,47 @@ export default function SOSScreen() {
     const [progress, setProgress] = useState(0);
     const [isActivated, setIsActivated] = useState(false);
     const [countdown, setCountdown] = useState(3);
+    
+    // 🚨 내 위치 정보 상태 (기본값은 빈 문자열)
+    const [locationInfo, setLocationInfo] = useState({
+        lat: null,
+        lng: null,
+        mapLink: ''
+    });
+    const [locationStatus, setLocationStatus] = useState('위치 파악 중...');
+
     const pressTimer = useRef(null);
     const countdownTimer = useRef(null);
 
-    // 🚨 SOS 발동 시 실행되는 함수 (문자 전송)
+    // 🚨 1. 화면이 켜지면 내 위치를 미리 가져옵니다.
+    useEffect(() => {
+        if (!navigator.geolocation) {
+            setLocationStatus('위치 정보 사용 불가');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                // 구글 지도 링크 생성 (가장 호환성이 좋음)
+                const link = `https://www.google.com/maps?q=${lat},${lng}`;
+                
+                setLocationInfo({ lat, lng, mapLink: link });
+                setLocationStatus('현위치 확보 완료');
+                console.log("📍 SOS 위치 확보:", link);
+            },
+            (error) => {
+                console.error("위치 파악 실패:", error);
+                setLocationStatus('위치 파악 실패 (GPS 확인 필요)');
+            },
+            { enableHighAccuracy: true } // 높은 정확도 사용
+        );
+    }, []);
+
     const triggerSOS = () => {
         setIsActivated(true);
         
-        // 3초 카운트다운 후 문자 앱 실행
         let count = 3;
         countdownTimer.current = setInterval(() => {
             count--;
@@ -29,34 +62,39 @@ export default function SOSScreen() {
     };
 
     const sendSMS = () => {
-        // 보호자 연락처 (실제로는 DB에서 가져와야 함)
-        const phoneNumbers = "010-1234-5678"; 
-        const message = "[SafeWay 긴급 알림] 현재 위험 상황입니다! 제 위치를 확인하고 도와주세요. (위치: 서울시청 부근)";
+        const phoneNumbers = "010-1234-5678"; // (나중에 DB에서 가져온 번호로 교체 가능)
         
-        // 모바일의 문자 앱을 엽니다 (sms: 프로토콜 사용)
+        // 🚨 2. 확보된 위치 링크를 문자에 포함
+        const locationMsg = locationInfo.mapLink 
+            ? `현재 제 위치입니다: ${locationInfo.mapLink}` 
+            : `(위치 정보를 가져오지 못했습니다)`;
+            
+        const message = `[SafeWay 긴급 알림] 🚨 지금 위험한 상황입니다! 도와주세요.\n${locationMsg}`;
+        
+        // 문자 앱 실행
         window.location.href = `sms:${phoneNumbers}?body=${encodeURIComponent(message)}`;
         
-        alert("🚨 긴급 문자가 전송되었습니다! (실제 기기에서는 문자 앱이 열립니다)");
-        setIsActivated(false);
-        setCountdown(3);
-        setProgress(0);
+        // 문자 앱 실행 후에는 앱의 SOS 상태 초기화
+        setTimeout(() => {
+            setIsActivated(false);
+            setCountdown(3);
+            setProgress(0);
+        }, 1000);
     };
 
-    // 버튼 누르기 시작
     const handleMouseDown = () => {
         setIsPressing(true);
         let currentProgress = 0;
         pressTimer.current = setInterval(() => {
-            currentProgress += 2; // 2%씩 증가
+            currentProgress += 2; 
             setProgress(currentProgress);
             if (currentProgress >= 100) {
                 clearInterval(pressTimer.current);
                 triggerSOS();
             }
-        }, 20); // 1초 동안 누르면 발동 (속도 조절 가능)
+        }, 20); 
     };
 
-    // 버튼에서 손 뗄 때 (취소)
     const handleMouseUp = () => {
         if (!isActivated) {
             setIsPressing(false);
@@ -79,12 +117,9 @@ export default function SOSScreen() {
 
             <main className="flex-grow flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
                 
-                {/* 배경 효과 (발동 시) */}
-                {isActivated && (
-                    <div className="absolute inset-0 bg-red-600 animate-pulse z-0"></div>
-                )}
+                {isActivated && <div className="absolute inset-0 bg-red-600 animate-pulse z-0"></div>}
 
-                <div className="relative z-10">
+                <div className="relative z-10 w-full max-w-xs">
                     {isActivated ? (
                         <div className="text-white animate-bounce">
                             <AlertTriangle className="w-24 h-24 mx-auto mb-4" />
@@ -104,21 +139,27 @@ export default function SOSScreen() {
                         </div>
                     ) : (
                         <>
-                            <div className="mb-12">
+                            <div className="mb-10">
                                 <h2 className="text-2xl font-bold text-gray-800 mb-2">위급 상황인가요?</h2>
-                                <p className="text-gray-500">버튼을 꾹 누르면 보호자에게 알림이 갑니다.</p>
+                                <p className="text-gray-500">버튼을 꾹 누르면 보호자에게<br/>현재 위치와 알림이 전송됩니다.</p>
+                                
+                                {/* 🚨 위치 상태 표시 (GPS 잡혔는지 확인용) */}
+                                <div className={`mt-4 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${locationInfo.lat ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                    <MapPin className="w-3 h-3 mr-1" />
+                                    {locationStatus}
+                                </div>
                             </div>
 
                             {/* SOS 버튼 */}
-                            <div className="relative w-48 h-48 mx-auto">
-                                {/* 진행률 원형 게이지 */}
+                            <div className="relative w-56 h-56 mx-auto select-none touch-none">
                                 <svg className="absolute inset-0 w-full h-full transform -rotate-90">
-                                    <circle cx="96" cy="96" r="90" stroke="#fee2e2" strokeWidth="12" fill="none" />
+                                    <circle cx="112" cy="112" r="106" stroke="#fee2e2" strokeWidth="12" fill="none" />
                                     <circle 
-                                        cx="96" cy="96" r="90" 
+                                        cx="112" cy="112" r="106" 
                                         stroke="#ef4444" strokeWidth="12" fill="none" 
-                                        strokeDasharray="565" 
-                                        strokeDashoffset={565 - (565 * progress) / 100}
+                                        strokeDasharray="666" 
+                                        strokeDashoffset={666 - (666 * progress) / 100}
+                                        strokeLinecap="round"
                                         className="transition-all duration-75"
                                     />
                                 </svg>
@@ -127,12 +168,12 @@ export default function SOSScreen() {
                                     onMouseDown={handleMouseDown}
                                     onMouseUp={handleMouseUp}
                                     onMouseLeave={handleMouseUp}
-                                    onTouchStart={handleMouseDown} // 모바일 터치 지원
+                                    onTouchStart={handleMouseDown}
                                     onTouchEnd={handleMouseUp}
-                                    className="absolute inset-2 bg-red-500 hover:bg-red-600 rounded-full flex flex-col items-center justify-center text-white shadow-xl transform active:scale-95 transition-all"
+                                    className="absolute inset-3 bg-red-500 hover:bg-red-600 rounded-full flex flex-col items-center justify-center text-white shadow-2xl transform active:scale-95 transition-all"
                                 >
-                                    <span className="text-4xl font-black tracking-widest mb-1">SOS</span>
-                                    <span className="text-xs opacity-80">꾹 누르세요</span>
+                                    <span className="text-5xl font-black tracking-widest mb-1 drop-shadow-md">SOS</span>
+                                    <span className="text-sm opacity-90 font-medium">2초간 꾹 누르세요</span>
                                 </button>
                             </div>
                         </>
@@ -140,7 +181,6 @@ export default function SOSScreen() {
                 </div>
             </main>
 
-            {/* 하단 긴급 전화 버튼 */}
             {!isActivated && (
                 <div className="p-6 bg-gray-50 border-t">
                     <a href="tel:112" className="flex items-center justify-center w-full bg-white border-2 border-red-100 text-red-500 py-4 rounded-xl font-bold hover:bg-red-50 transition shadow-sm">
