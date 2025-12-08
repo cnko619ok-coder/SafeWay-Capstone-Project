@@ -14,18 +14,7 @@ export default function RouteResultScreen() {
     const { routeData, searchData, pathPoints } = location.state || {};
     const [map, setMap] = useState(null); 
 
-    if (!routeData) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
-                <p className="text-gray-600 mb-4">경로 데이터가 없습니다.</p>
-                <Link to="/" className="text-blue-600 font-bold underline">홈으로 돌아가기</Link>
-            </div>
-        );
-    }
-
-    const { safety, shortest } = routeData;
-    
-    // 🚨 지도에 그릴 경로: 전달받은 좌표가 있으면 쓰고, 없으면 기본값 사용
+     // 🚨 지도에 그릴 경로: 전달받은 좌표가 있으면 쓰고, 없으면 기본값 사용
     const mapPath = pathPoints && pathPoints.length > 0 ? pathPoints : [
         { lat: 37.5668, lng: 126.9790 }, { lat: 37.5672, lng: 126.9794 }
     ];
@@ -39,6 +28,17 @@ export default function RouteResultScreen() {
         }
     }, [map, mapPath]);
 
+    if (!routeData) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
+                <p className="text-gray-600 mb-4">경로 데이터가 없습니다.</p>
+                <Link to="/" className="text-blue-600 font-bold underline">홈으로 돌아가기</Link>
+            </div>
+        );
+    }
+
+    const { safety, shortest } = routeData;
+    
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col relative font-sans">
             

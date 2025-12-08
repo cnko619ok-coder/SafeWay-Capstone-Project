@@ -1,6 +1,6 @@
 // frontend/src/ReportDetailScreen.js
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { ArrowLeft, MapPin, ThumbsUp, MessageSquare, Send, User, Trash2 } from 'lucide-react';
 import { Map, MapMarker } from 'react-kakao-maps-sdk';
@@ -12,7 +12,7 @@ export default function ReportDetailScreen({ userUid }) {
     const { report } = location.state || {}; // 목록에서 넘겨준 데이터 받기
 
     // 댓글 상태 관리 (임시)
-    cconst [comment, setComment] = useState('');
+    const [comment, setComment] = useState('');
     
     // 🚨 [핵심 수정] 초기 댓글을 로컬 스토리지에서 가져오기
     const [commentsList, setCommentsList] = useState(() => {
