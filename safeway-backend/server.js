@@ -10,6 +10,8 @@ const app = express();
 
 const port = process.env.PORT || 3005;
 
+const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY;
+
 // 1. Firebase Admin SDK 초기화
 const serviceAccount = require('./firebase-admin-key.json'); 
 admin.initializeApp({
@@ -91,15 +93,36 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
+// 🚨🚨🚨 사용자 로그인 API (비밀번호 검증 포함) 🚨🚨🚨
 app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: '필수 정보 누락' });
+    
+    if (!email || !password) {
+        return res.status(400).json({ error: '이메일과 비밀번호는 필수입니다.' });
+    }
+
     try {
-        const user = await auth.getUserByEmail(email);
-        const customToken = await auth.createCustomToken(user.uid); 
-        res.status(200).json({ message: '로그인 성공', uid: user.uid, token: customToken });
+        // Firebase REST API를 사용하여 비밀번호 검증
+        const loginUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_WEB_API_KEY}`;
+        
+        const response = await axios.post(loginUrl, {
+            email: email,
+            password: password,
+            returnSecureToken: true
+        });
+
+        const { localId, idToken } = response.data;
+
+        res.status(200).json({ 
+            message: '로그인 성공', 
+            uid: localId, 
+            token: idToken 
+        });
+
     } catch (error) {
-        res.status(401).json({ error: '로그인 실패', details: error.message });
+        // 비밀번호가 틀리면 400 Bad Request 에러가 발생함
+        console.error('로그인 실패:', error.response?.data?.error?.message || error.message);
+        res.status(401).json({ error: '이메일 또는 비밀번호가 일치하지 않습니다.' });
     }
 });
 
@@ -238,6 +261,62 @@ app.delete('/api/contacts', requireAuth, async (req, res) => {
     } catch (error) {
         console.error(`❌ 삭제 실패:`, error);
         res.status(500).json({ error: '삭제 실패', details: error.message });
+    }
+});
+
+// =======================================================
+//           D. 위험 지역 신고 게시판 API
+// =======================================================
+
+// 1. 신고 글 등록 (POST /api/reports)
+app.post('/api/reports', requireAuth, async (req, res) => {
+    const { uid, title, type, content, location } = req.body;
+    
+    if (!title || !content || !location) {
+        return res.status(400).json({ error: '필수 정보(제목, 내용, 위치)가 누락되었습니다.' });
+    }
+
+    try {
+        // 작성자 이름 가져오기 (UI 표시용)
+        const userDoc = await db.collection('users').doc(uid).get();
+        const userName = userDoc.exists ? userDoc.data().name : '익명';
+
+        const newReport = {
+            uid,
+            writer: userName,
+            title,
+            type: type || 'danger', // danger(위험), warning(주의), safe(안전)
+            content,
+            location,
+            likes: 0,
+            comments: 0,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            displayDate: new Date().toISOString().split('T')[0] // 목록 표시용 날짜
+        };
+
+        await db.collection('reports').add(newReport);
+        res.status(201).json({ message: '신고가 성공적으로 등록되었습니다.' });
+    } catch (error) {
+        console.error('신고 등록 실패:', error);
+        res.status(500).json({ error: '신고 등록에 실패했습니다.' });
+    }
+});
+
+// 2. 신고 글 목록 조회 (GET /api/reports)
+app.get('/api/reports', async (req, res) => {
+    try {
+        // 최신순으로 정렬하여 가져오기
+        const snapshot = await db.collection('reports').orderBy('createdAt', 'desc').get();
+        const reports = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            // Timestamp 객체는 JSON 변환 시 문제가 될 수 있어 처리
+            createdAt: doc.data().createdAt ? doc.data().createdAt.toDate() : new Date()
+        }));
+        res.status(200).json(reports);
+    } catch (error) {
+        console.error('신고 목록 조회 실패:', error);
+        res.status(500).json({ error: '목록을 불러오지 못했습니다.' });
     }
 });
 

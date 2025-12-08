@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useKakaoLoader } from 'react-kakao-maps-sdk'; // 🚨 Loader 임포트
+
 import { AuthScreen } from './AuthScreen';
-import MainScreen from './MainScreen'; // MainScreen.js 파일이 필요합니다.
-import EmergencyContactScreen from './EmergencyContactScreen'; // EmergencyContactScreen.js 파일이 필요합니다.
+import MainScreen from './MainScreen'; 
+import EmergencyContactScreen from './EmergencyContactScreen'; 
 import RouteSearchScreen from './RouteSearchScreen'; 
 import RouteResultScreen from './RouteResultScreen';
-import axios from 'axios'; // 🚨 axios import 확인
+import axios from 'axios'; 
+import ReportBoardScreen from './ReportBoardScreen';
+import ProfileScreen from './ProfileScreen'; 
+import BottomNavigation from './BottomNavigation';
+import SOSScreen from './SOSScreen'; 
+import MyReportsScreen from './MyReportsScreen';
+import ReturnHistoryScreen from './ReturnHistoryScreen';
+import ReportDetailScreen from './ReportDetailScreen';
 
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'any';
 
@@ -33,6 +41,10 @@ function App() {
 
     return (
         <Router>
+            <div className="flex flex-col min-h-screen bg-gray-50">
+
+          {/* 콘텐츠 영역 (메뉴바 높이만큼 하단 여백 추가: pb-20) */}
+          <div className={`flex-grow ${isLoggedIn ? 'pb-20' : ''}`}>
             <Routes>
                 {/* 로그인 화면: 로그인 상태가 아니면 AuthScreen 표시 */}
                 <Route 
@@ -63,15 +75,40 @@ function App() {
                   element={isLoggedIn ? <RouteResultScreen /> : <Navigate to="/login" />} 
                 />
                 
-                {/* 위험 지역 게시판 임시 라우트 추가 */}
+                {/* 🚨🚨🚨 위험 지역 게시판 라우트 연결 (수정됨) */}
                 <Route 
                     path="/report-board" 
-                    element={isLoggedIn ? <div>위험 지역 신고 게시판 UI (구현 예정)</div> : <Navigate to="/login" />} 
+                    element={isLoggedIn ? <ReportBoardScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                />
+
+                {/* 🚨 프로필 화면 라우트 추가 */}
+                <Route 
+                    path="/profile" 
+                    element={isLoggedIn ? <ProfileScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                />
+
+                {/* 🚨 상세 화면 라우트 추가 */}
+                <Route path="/profile/reports" element={isLoggedIn ? <MyReportsScreen /> : <Navigate to="/login" />} />
+                <Route path="/profile/history" element={isLoggedIn ? <ReturnHistoryScreen /> : <Navigate to="/login" />} />
+                <Route 
+                    path="/report-board/:id" 
+                    element={isLoggedIn ? <ReportDetailScreen /> : <Navigate to="/login" />} 
+                />
+
+                {/* 🚨 SOS 화면 라우트 추가 */}
+                <Route 
+                    path="/sos" 
+                    element={isLoggedIn ? <SOSScreen /> : <Navigate to="/login" />} 
                 />
                 
                 {/* 기본 접속 시 /login으로 이동 */}
                 <Route path="*" element={<Navigate to="/login" />} />
             </Routes>
+            </div>
+            {/* 🚨 로그인 상태일 때만 하단 메뉴바 표시 (모든 화면 공통) */}
+            {isLoggedIn && <BottomNavigation />}
+
+          </div>
         </Router>
     );
 }

@@ -54,9 +54,22 @@ export function AuthScreen({ onLoginSuccess }) {
       }
 
     } catch (error) {
-      // ERR_CONNECTION_REFUSED와 같은 네트워크 오류 처리
-      const msg = error.response?.data?.details || error.message || '네트워크 연결 오류';
-      setAuthStatus(`오류: ${msg}`);
+      // 🚨🚨🚨 [수정된 에러 처리 로직] 🚨🚨🚨
+      
+      // 1. 401 에러 (비밀번호 틀림/계정 없음)일 때 친절한 메시지 표시
+      if (error.response && error.response.status === 401) {
+        setAuthStatus('❌ 이메일 또는 비밀번호가 올바르지 않습니다.');
+      } 
+      // 2. 그 외 서버에서 보낸 구체적인 에러 메시지가 있는 경우
+      else if (error.response && error.response.data && error.response.data.error) {
+        setAuthStatus(`❌ 오류: ${error.response.data.error}`);
+      }
+      // 3. 그 외 알 수 없는 네트워크 오류 등
+      else {
+        setAuthStatus('❌ 서버 연결에 실패했습니다. 다시 시도해 주세요.');
+      }
+      
+      console.error('로그인/회원가입 에러:', error);
     }
   };
 
