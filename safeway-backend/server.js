@@ -43,6 +43,7 @@ let cachedStreetlights = [];
 
 // 🚨🚨🚨 [추가] 서버 시작 시 가로등 데이터를 한 번만 불러오는 함수
 async function loadStreetlightsData() {
+    if (cachedStreetlights.length > 0) return;
     try {
         console.log("📡 가로등 데이터 로딩 시작...");
         const snapshot = await db.collection('streetlights').get();
@@ -272,9 +273,7 @@ app.delete('/api/contacts', requireAuth, async (req, res) => {
 app.post('/api/reports', requireAuth, async (req, res) => {
     const { uid, title, type, content, location } = req.body;
     
-    if (!title || !content || !location) {
-        return res.status(400).json({ error: '필수 정보(제목, 내용, 위치)가 누락되었습니다.' });
-    }
+    if (!title || !content) return res.status(400).json({ error: '필수 정보 누락' });
 
     try {
         // 작성자 이름 가져오기 (UI 표시용)
