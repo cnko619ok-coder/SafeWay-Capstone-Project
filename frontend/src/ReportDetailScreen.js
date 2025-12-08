@@ -2,36 +2,63 @@
 
 import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { ArrowLeft, MapPin, ThumbsUp, MessageSquare, Send, User } from 'lucide-react';
+import { ArrowLeft, MapPin, ThumbsUp, MessageSquare, Send, User, Trash2 } from 'lucide-react';
 import { Map, MapMarker } from 'react-kakao-maps-sdk';
 
 const KAKAO_APP_KEY = '15b6d60e4095cdc453d99c4883ad6e6d';
 
-export default function ReportDetailScreen() {
+export default function ReportDetailScreen({ userUid }) {
     const location = useLocation();
     const { report } = location.state || {}; // 목록에서 넘겨준 데이터 받기
 
     // 댓글 상태 관리 (임시)
-    const [comment, setComment] = useState('');
-    const [commentsList, setCommentsList] = useState([
-        { id: 1, user: '안전이', content: '저도 어제 그곳을 지나갔는데 정말 어두워서 무서웠어요. 정보 감사합니다!', time: '1시간 전', likes: 5 },
-        { id: 2, user: '조심이', content: '가로등이 빨리 수리되었으면 좋겠네요.', time: '30분 전', likes: 2 },
-    ]);
+    cconst [comment, setComment] = useState('');
+    
+    // 🚨 [핵심 수정] 초기 댓글을 로컬 스토리지에서 가져오기
+    const [commentsList, setCommentsList] = useState(() => {
+        if (!report) return [];
+        
+        // 브라우저 저장소에서 'comments_글번호'로 저장된 데이터가 있는지 확인
+        const savedComments = localStorage.getItem(`comments_${report.id}`);
+        
+        if (savedComments) {
+            return JSON.parse(savedComments); // 저장된 게 있으면 그거 사용
+        } else {
+            // 없으면 기본 가짜 댓글 보여주기
+            return [
+                { id: 1, uid: 'other-1', user: '안전이', content: '저도 어제 그곳을 지나갔는데 정말 어두워서 무서웠어요.', time: '1시간 전' },
+                { id: 2, uid: 'other-2', user: '조심이', content: '가로등이 빨리 수리되었으면 좋겠네요.', time: '30분 전' },
+            ];
+        }
+    });
 
+    // 🚨 [핵심 수정] 댓글 목록이 바뀔 때마다 로컬 스토리지에 저장
+    useEffect(() => {
+        if (report && commentsList) {
+            localStorage.setItem(`comments_${report.id}`, JSON.stringify(commentsList));
+        }
+    }, [commentsList, report]);
     const handleAddComment = (e) => {
         e.preventDefault();
         if (!comment.trim()) return;
         
-        // 새 댓글 추가 (임시)
         const newComment = {
             id: Date.now(),
-            user: '나',
+            uid: userUid, // 🚨 내 UID를 댓글에 저장 (핵심!)
+            user: '나',   // (실제로는 사용자 이름 가져와야 함)
             content: comment,
             time: '방금 전',
-            likes: 0
         };
         setCommentsList([newComment, ...commentsList]);
         setComment('');
+    };
+
+    // 🚨 댓글 삭제 함수
+    const handleDeleteComment = (commentId) => {
+        if (window.confirm("댓글을 삭제하시겠습니까?")) {
+            // 선택한 댓글만 제외하고 목록 업데이트
+            setCommentsList(commentsList.filter(c => c.id !== commentId));
+        }
     };
 
     if (!report) return <div className="p-10 text-center">데이터가 없습니다.</div>;
@@ -99,7 +126,8 @@ export default function ReportDetailScreen() {
                 <form onSubmit={handleAddComment} className="relative mb-6">
                     <input 
                         type="text" 
-                        placeholder="댓글을 입력하세요..." 
+                        placeholder={userUid ? "댓글을 입력하세요..." : "로그인이 필요합니다."}
+                        disabled={!userUid}
                         className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors"
                         value={comment}
                         onChange={(e) => setComment(e.target.value)}
@@ -113,16 +141,27 @@ export default function ReportDetailScreen() {
                 <div className="space-y-4">
                     <h3 className="font-bold text-gray-800">댓글 {commentsList.length}개</h3>
                     {commentsList.map((c) => (
-                        <div key={c.id} className="flex space-x-3">
-                            <div className="bg-gray-100 p-2 rounded-full h-8 w-8 flex items-center justify-center">
+                        <div key={c.id} className="flex space-x-3 group">
+                            <div className="bg-gray-100 p-2 rounded-full h-8 w-8 flex items-center justify-center flex-shrink-0">
                                 <User className="w-4 h-4 text-gray-500" />
                             </div>
-                            <div className="flex-1 bg-gray-50 p-3 rounded-xl rounded-tl-none">
+                            <div className="flex-1 bg-gray-50 p-3 rounded-xl rounded-tl-none relative">
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="font-bold text-sm text-gray-700">{c.user}</span>
                                     <span className="text-xs text-gray-400">{c.time}</span>
                                 </div>
-                                <p className="text-sm text-gray-600">{c.content}</p>
+                                <p className="text-sm text-gray-600 pr-6">{c.content}</p>
+
+                                {/* 🚨🚨🚨 내 댓글일 때만 삭제 버튼 표시 🚨🚨🚨 */}
+                                {userUid && c.uid === userUid && (
+                                    <button 
+                                        onClick={() => handleDeleteComment(c.id)}
+                                        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"
+                                        title="댓글 삭제"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}
