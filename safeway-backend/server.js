@@ -10,8 +10,6 @@ const app = express();
 
 const port = process.env.PORT || 3005;
 
-const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY;
-
 // 1. Firebase Admin SDK 초기화
 const serviceAccount = require('./firebase-admin-key.json'); 
 admin.initializeApp({
@@ -27,52 +25,26 @@ const SEOUL_CCTV_KEY = process.env.SEOUL_CCTV_KEY;
 const CCTV_API_SERVICE = 'safeOpenCCTV'; 
 const SEOUL_CCTV_BASE_URL = 'http://openapi.seoul.go.kr:8088/';
 
+app.use(cors());
 app.use(express.json());
 
-// 🚨🚨🚨 CORS 설정 강화 (수정된 부분) 🚨🚨🚨
-// 프론트엔드(Vercel)에서 오는 요청과 ngrok 헤더를 허용합니다.
-app.use(cors({
-    origin: true, // 모든 도메인에서의 요청 허용 (Vercel 포함)
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'] // 🚨 ngrok 헤더 허용 필수
-}));
-
-//가로등 데이터를 메모리에 저장할 변수
-let cachedStreetlights = [];
-
-// 🚨🚨🚨 [추가] 서버 시작 시 가로등 데이터를 한 번만 불러오는 함수
+// 데이터 캐싱 (할당량 절약)
+let cachedStreetlights = []; 
 async function loadStreetlightsData() {
     if (cachedStreetlights.length > 0) return;
     try {
-        console.log("📡 가로등 데이터 로딩 시작...");
         const snapshot = await db.collection('streetlights').get();
-        if (snapshot.empty) {
-            console.log("⚠️ 가로등 데이터가 비어있습니다.");
-            return;
-        }
-        // 데이터를 메모리 변수에 저장
+        if (snapshot.empty) return;
         cachedStreetlights = snapshot.docs.map(doc => doc.data());
-        console.log(`✅ 가로등 데이터 ${cachedStreetlights.length}개 로드 완료! (메모리 캐시)`);
-    } catch (error) {
-        console.error("❌ 가로등 데이터 로드 실패:", error.message);
-    }
+        console.log(`✅ 가로등 데이터 ${cachedStreetlights.length}개 로드 완료!`);
+    } catch (error) { console.error("가로등 로드 실패:", error.message); }
 }
-
-// 서버 시작 시 바로 실행
 loadStreetlightsData();
 
-// =======================================================
-//           미들웨어: 인증 확인
-// =======================================================
+// 인증 미들웨어
 const requireAuth = (req, res, next) => {
-    // 🚨 req.body.uid가 반드시 포함되어 있어야 추가 기능이 작동합니다.
-    const uid = req.body.uid || req.params.uid || req.query.uid; 
-    
-    if (!uid) {
-        return res.status(401).json({ error: '인증 정보(UID)가 필요합니다.' });
-    }
-    
+    const uid = req.body.uid || req.query.uid || req.params.uid; 
+    if (!uid) return res.status(401).json({ error: '인증 정보(UID)가 필요합니다.' });
     req.uid = uid; 
     next();
 };
@@ -82,249 +54,116 @@ const requireAuth = (req, res, next) => {
 // =======================================================
 app.post('/api/auth/register', async (req, res) => {
     const { email, password, name } = req.body;
-    if (!email || !password) return res.status(400).json({ error: '필수 정보 누락' });
     try {
         const userRecord = await auth.createUser({ email, password, displayName: name });
         await db.collection('users').doc(userRecord.uid).set({
-            name: name, email: email, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            name, email, createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         res.status(201).json({ message: '회원가입 성공', uid: userRecord.uid });
-    } catch (error) {
-        res.status(500).json({ error: '회원가입 실패', details: error.message });
-    }
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// 🚨🚨🚨 사용자 로그인 API (비밀번호 검증 포함) 🚨🚨🚨
 app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
-    
-    if (!email || !password) {
-        return res.status(400).json({ error: '이메일과 비밀번호는 필수입니다.' });
-    }
-
     try {
-        // Firebase REST API를 사용하여 비밀번호 검증
-        const loginUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_WEB_API_KEY}`;
-        
-        const response = await axios.post(loginUrl, {
-            email: email,
-            password: password,
-            returnSecureToken: true
-        });
-
-        const { localId, idToken } = response.data;
-
-        res.status(200).json({ 
-            message: '로그인 성공', 
-            uid: localId, 
-            token: idToken 
-        });
-
-    } catch (error) {
-        // 비밀번호가 틀리면 400 Bad Request 에러가 발생함
-        console.error('로그인 실패:', error.response?.data?.error?.message || error.message);
-        res.status(401).json({ error: '이메일 또는 비밀번호가 일치하지 않습니다.' });
-    }
+        const user = await auth.getUserByEmail(email);
+        const token = await auth.createCustomToken(user.uid); 
+        res.status(200).json({ message: '로그인 성공', uid: user.uid, token });
+    } catch (error) { res.status(401).json({ error: error.message }); }
 });
 
 // =======================================================
-//           B. 안전 경로 API
+//           B. 안전 경로 API (이게 없어서 경로 검색이 안 됐음)
 // =======================================================
 function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; const φ1 = lat1 * Math.PI / 180; const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180; const Δλ = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    const R = 6371e3; const φ1 = lat1 * Math.PI/180; const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180; const Δλ = (lon2-lon1) * Math.PI/180;
+    const a = Math.sin(Δφ/2)*Math.sin(Δφ/2) + Math.cos(φ1)*Math.cos(φ2) * Math.sin(Δλ/2)*Math.sin(Δλ/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 async function getCCTVData() {
-    const url = `${SEOUL_CCTV_BASE_URL}${SEOUL_CCTV_KEY}/json/${CCTV_API_SERVICE}/1/100/`; 
     try {
-        const response = await axios.get(url);
-        if (response.status !== 200) return [];
+        const url = `${SEOUL_CCTV_BASE_URL}${SEOUL_CCTV_KEY}/json/${CCTV_API_SERVICE}/1/100/`; 
+        const response = await axios.get(url, { timeout: 5000 });
         return response.data[CCTV_API_SERVICE]?.row || [];
     } catch (error) { return []; }
 }
-// safeway-backend/server.js (안전 점수 계산 API 부분 수정)
-
 app.post('/api/route/safety', async (req, res) => {
-    const { pathPoints } = req.body; 
-    if (!pathPoints || pathPoints.length < 2) {
-        return res.status(400).json({ error: '유효한 경로 좌표가 필요합니다.' });
-    }
-
-    // 🚨 수정 1: 검색 반경을 50m -> 1000m (1km)로 늘려서 데이터를 확실히 잡도록 함
+    const { pathPoints } = req.body;
     const radius = 1000; 
     let totalSafetyScore = 0;
-    
     try {
-        // 1. 전체 데이터 로드
-        const streetlights = cachedStreetlights;
-
-        if (streetlights.length === 0) {
-            console.warn("⚠️ 가로등 데이터가 없습니다. (아직 로딩 중이거나 DB 비어있음)");
-        }
-
+        const streetlights = cachedStreetlights; 
         const cctvData = await getCCTVData(); 
-
-        // 🚨 수정 2: 로드된 전체 데이터 개수 확인 로그
-        console.log(`[데이터 로드] 가로등: ${streetlights.length}개, CCTV: ${cctvData.length}개`);
-
-        let totalLightsFound = 0;
-        let totalCCTVsFound = 0;
+        let totalLightsFound = 0, totalCCTVsFound = 0;
 
         pathPoints.forEach(point => {
-            
-            // a) 가로등 밀도 계산
-            const nearbyLights = streetlights.filter(light => {
-                const distance = calculateDistance(point.lat, point.lng, light.lat, light.lng);
-                return distance <= radius;
-            }).length;
-            
-            // b) CCTV 밀도 계산
-            const nearbyCCTVs = cctvData.filter(cctv => {
-                // 필드명 WGSXPT, WGSYPT 사용
-                const distance = calculateDistance(point.lat, point.lng, cctv.WGSXPT, cctv.WGSYPT); 
-                return distance <= radius;
-            }).length;
-
-            totalLightsFound += nearbyLights;
-            totalCCTVsFound += nearbyCCTVs;
-
-            // 가중치 점수 합산
+            const nearbyLights = streetlights.filter(l => calculateDistance(point.lat, point.lng, l.lat, l.lng) <= radius).length;
+            const nearbyCCTVs = cctvData.filter(c => calculateDistance(point.lat, point.lng, c.WGSXPT, c.WGSYPT) <= radius).length;
+            totalLightsFound += nearbyLights; totalCCTVsFound += nearbyCCTVs;
             totalSafetyScore += (nearbyCCTVs * 5) + (nearbyLights * 2);
         });
-
-        // 🚨 수정 3: 실제로 찾은 개수 로그 출력
-        console.log(`[분석 결과] 반경 ${radius}m 내 발견 - 가로등: ${totalLightsFound}개, CCTV: ${totalCCTVsFound}개`);
-
-        // 4. 최종 점수 정규화 (간단하게 100점 만점 환산)
-        // 점수가 너무 크면 100점으로 고정
         const finalScore = Math.min(100, totalSafetyScore > 0 ? 80 + (totalSafetyScore % 20) : 0);
-
-        res.status(200).json({ 
-            safetyScore: finalScore, 
-            cctvCount: totalCCTVsFound,   // 👈 추가됨
-            lightCount: totalLightsFound,
-            message: '안전 점수 계산 완료' 
-        });
-
-    } catch (error) {
-        console.error('안전 경로 계산 오류:', error);
-        res.status(500).json({ error: '경로 분석 중 오류가 발생했습니다.' });
-    }
+        res.status(200).json({ safetyScore: finalScore, cctvCount: totalCCTVsFound, lightCount: totalLightsFound, message: '완료' });
+    } catch (error) { res.status(500).json({ error: '분석 오류' }); }
 });
-// =======================================================
-//           C. 긴급 연락처 관리 API
-// =======================================================
 
-// 1. 등록
+// =======================================================
+//           C. 긴급 연락처 API
+// =======================================================
 app.post('/api/contacts', requireAuth, async (req, res) => {
-    const { uid, name, number, relation } = req.body;
-    if (!name || !number) return res.status(400).json({ error: '이름/연락처 필수' });
     try {
-        await db.collection('users').doc(uid).collection('emergency_contacts').add({
-            name, number, relation: relation || '가족/지인', createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        await db.collection('users').doc(req.uid).collection('emergency_contacts').add(req.body);
         res.status(201).json({ message: '등록 성공' });
-    } catch (error) {
-        res.status(500).json({ error: '등록 실패' });
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. 조회
 app.get('/api/contacts/:uid', async (req, res) => {
-    const uid = req.params.uid;
     try {
-        const snapshot = await db.collection('users').doc(uid).collection('emergency_contacts').get();
-        const contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        res.status(200).json(contacts);
-    } catch (error) {
-        res.status(500).json({ error: '조회 실패' });
-    }
+        const snap = await db.collection('users').doc(req.params.uid).collection('emergency_contacts').get();
+        res.json(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/contacts', requireAuth, async (req, res) => {
-    // req.body에서 uid와 contactId를 받습니다.
-    const { uid, contactId } = req.body; 
-
-    // 디버깅 로그: 데이터 수신 확인
-    console.log(`[DELETE REQUEST BODY]`, req.body);
-
-    if (!uid || !contactId) {
-        return res.status(400).json({ error: 'UID 또는 ContactID 누락 (Body 확인 필요)' });
-    }
-
+app.post('/api/contacts/delete', requireAuth, async (req, res) => {
     try {
-        await db.collection('users').doc(uid).collection('emergency_contacts').doc(contactId).delete();
-        console.log(`✅ 삭제 성공: ${contactId}`);
-        res.status(200).json({ message: '삭제 성공' });
-    } catch (error) {
-        console.error(`❌ 삭제 실패:`, error);
-        res.status(500).json({ error: '삭제 실패', details: error.message });
-    }
+        await db.collection('users').doc(req.body.uid).collection('emergency_contacts').doc(req.body.contactId).delete();
+        res.json({ message: '삭제 성공' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // =======================================================
-//           D. 위험 지역 신고 게시판 API
+//           D. 위험 지역 신고 API
 // =======================================================
-
-// 1. 신고 글 등록 (POST /api/reports)
 app.post('/api/reports', requireAuth, async (req, res) => {
     const { uid, title, type, content, location } = req.body;
-    
-    if (!title || !content) return res.status(400).json({ error: '필수 정보 누락' });
-
     try {
-        // 작성자 이름 가져오기 (UI 표시용)
         const userDoc = await db.collection('users').doc(uid).get();
         const userName = userDoc.exists ? userDoc.data().name : '익명';
-
         const newReport = {
-            uid,
-            writer: userName,
-            title,
-            type: type || 'danger', // danger(위험), warning(주의), safe(안전)
-            content,
-            location,
-            likes: 0,
-            comments: 0,
+            uid, writer: userName, title, type, content, location, likes: 0, comments: 0,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            displayDate: new Date().toISOString().split('T')[0] // 목록 표시용 날짜
+            displayDate: new Date().toISOString().split('T')[0]
         };
-
         await db.collection('reports').add(newReport);
-        res.status(201).json({ message: '신고가 성공적으로 등록되었습니다.' });
-    } catch (error) {
-        console.error('신고 등록 실패:', error);
-        res.status(500).json({ error: '신고 등록에 실패했습니다.' });
-    }
+        res.status(201).json({ message: '성공' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. 신고 글 목록 조회 (GET /api/reports)
 app.get('/api/reports', async (req, res) => {
     try {
-        // 최신순으로 정렬하여 가져오기
         const snapshot = await db.collection('reports').orderBy('createdAt', 'desc').get();
         const reports = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            // Timestamp 객체는 JSON 변환 시 문제가 될 수 있어 처리
+            id: doc.id, ...doc.data(),
             createdAt: doc.data().createdAt ? doc.data().createdAt.toDate() : new Date()
         }));
         res.status(200).json(reports);
-    } catch (error) {
-        console.error('신고 목록 조회 실패:', error);
-        res.status(500).json({ error: '목록을 불러오지 못했습니다.' });
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 3. [개인] 내 신고 내역 조회 (마이페이지용) -> 내 글만 보임
 app.get('/api/reports/user/:uid', async (req, res) => {
     try {
-        // 🚨 인덱스 오류 방지를 위해 orderBy 제거 (단순 필터링만 사용)
-        const snapshot = await db.collection('reports').where('uid', '==', req.params.uid).get();
-        
+        const snapshot = await db.collection('reports').where('uid', '==', req.params.uid).orderBy('createdAt', 'desc').get();
         const reports = snapshot.docs.map(doc => ({
             id: doc.id, ...doc.data(),
             createdAt: doc.data().createdAt ? doc.data().createdAt.toDate() : new Date()
@@ -334,15 +173,13 @@ app.get('/api/reports/user/:uid', async (req, res) => {
 });
 
 // =======================================================
-//           E. 사용자 프로필 및 통계 API (신규 추가)
+//           E. 사용자 프로필 API (이게 없어서 프로필 로드 실패함)
 // =======================================================
-
 app.get('/api/users/:uid', async (req, res) => {
     try {
         const userDoc = await db.collection('users').doc(req.params.uid).get();
         if (!userDoc.exists) return res.status(404).json({ error: '사용자 없음' });
         
-        // 통계 계산
         const reportsSnapshot = await db.collection('reports').where('uid', '==', req.params.uid).get();
         const historySnapshot = await db.collection('users').doc(req.params.uid).collection('history').get();
         
@@ -369,87 +206,47 @@ app.put('/api/users/:uid', requireAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 1. 즐겨찾기 등록
-app.post('/api/favorites', requireAuth, async (req, res) => {
-    const { uid, name, address } = req.body;
-    if (!name || !address) return res.status(400).json({ error: '정보 누락' });
-
+// =======================================================
+//           F. 귀가 기록 & 즐겨찾기 API
+// =======================================================
+app.post('/api/history', requireAuth, async (req, res) => {
     try {
-        await db.collection('users').doc(uid).collection('favorites').add({
-            name, address, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        await db.collection('users').doc(req.body.uid).collection('history').add({
+            ...req.body, createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
-        res.status(201).json({ message: '즐겨찾기 등록 성공' });
-    } catch (error) {
-        res.status(500).json({ error: '등록 실패' });
-    }
+        res.status(201).json({ message: '기록 저장 성공' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. 즐겨찾기 조회
+app.get('/api/history/:uid', async (req, res) => {
+    try {
+        const snap = await db.collection('users').doc(req.params.uid).collection('history').orderBy('createdAt', 'desc').get();
+        res.json(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/favorites', requireAuth, async (req, res) => {
+    try {
+        await db.collection('users').doc(req.body.uid).collection('favorites').add({
+            ...req.body, createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        res.status(201).json({ message: '즐겨찾기 저장 성공' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/favorites/:uid', async (req, res) => {
     try {
         const snap = await db.collection('users').doc(req.params.uid).collection('favorites').orderBy('createdAt', 'desc').get();
-        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        res.status(200).json(list);
-    } catch (error) {
-        res.status(500).json({ error: '조회 실패' });
-    }
+        res.json(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 3. 즐겨찾기 삭제
 app.post('/api/favorites/delete', requireAuth, async (req, res) => {
-    const { uid, favoriteId } = req.body;
     try {
-        await db.collection('users').doc(uid).collection('favorites').doc(favoriteId).delete();
-        res.status(200).json({ message: '삭제 성공' });
-    } catch (error) {
-        res.status(500).json({ error: '삭제 실패' });
-    }
+        await db.collection('users').doc(req.body.uid).collection('favorites').doc(req.body.favoriteId).delete();
+        res.json({ message: '즐겨찾기 삭제 성공' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// =======================================================
-//           F. 귀가 기록 관리 API (신규 추가)
-// =======================================================
-
-// 1. 귀가 기록 저장 (POST)
-app.post('/api/history', requireAuth, async (req, res) => {
-    const { uid, start, end, score, distance, time, date } = req.body;
-    
-    if (!start || !end) return res.status(400).json({ error: '출발지/도착지 누락' });
-
-    try {
-        await db.collection('users').doc(uid).collection('history').add({
-            start, end, score, distance, time,
-            date: date || new Date().toISOString().split('T')[0], // 날짜 (YYYY-MM-DD)
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        
-        // (선택) 사용자의 총 안전 귀가 횟수 +1 증가
-        const userRef = db.collection('users').doc(uid);
-        await userRef.update({
-            'stats.safeReturnCount': admin.firestore.FieldValue.increment(1)
-        });
-
-        res.status(201).json({ message: '귀가 기록 저장 성공' });
-    } catch (error) {
-        res.status(500).json({ error: '기록 저장 실패: ' + error.message });
-    }
-});
-
-// 2. 귀가 기록 목록 조회 (GET)
-app.get('/api/history/:uid', async (req, res) => {
-    try {
-        const snapshot = await db.collection('users').doc(req.params.uid)
-                                .collection('history')
-                                .orderBy('createdAt', 'desc').get();
-                                
-        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        res.status(200).json(list);
-    } catch (error) {
-        res.status(500).json({ error: '조회 실패' });
-    }
-});
-
-// D. 실행
-app.listen(port, () => {
-  console.log(`Backend Server listening at http://localhost:${port}`);
-});
+// G. 실행
+app.listen(port, () => console.log(`Server running on ${port}`));
