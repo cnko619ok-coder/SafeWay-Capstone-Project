@@ -29,7 +29,7 @@ function App() {
 
     // 🚨🚨🚨 [핵심 수정] 지도 SDK와 'services' 라이브러리를 여기서 미리 로드합니다.
     useKakaoLoader({
-      appkey: "15b6d60e4095cdc453d99c4883ad6e6d",
+      appkey: "e8757f3638207e014bcea23f202b11d8",
       libraries: ["services", "clusterer", "drawing"], // 주소 검색에 필수!
     });
 
