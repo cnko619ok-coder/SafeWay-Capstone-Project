@@ -6,7 +6,7 @@ import axios from 'axios';
 import { Shield, Clock, MapPin, Navigation, Camera, Lightbulb, ChevronLeft, AlertTriangle, Scale } from 'lucide-react';
 import { Map, MapMarker, Polyline } from 'react-kakao-maps-sdk';
 
-const KAKAO_APP_KEY = '15b6d60e4095cdc453d99c4883ad6e6d'; 
+const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8'; 
 // 🚨 ngrok 주소 확인 (바뀌었다면 수정 필요)
 const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
 

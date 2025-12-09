@@ -6,7 +6,7 @@ import { Map, MapMarker, Polyline } from 'react-kakao-maps-sdk';
 import { Phone, Check, AlertTriangle, User } from 'lucide-react';
 import axios from 'axios';
 
-const KAKAO_APP_KEY = '15b6d60e4095cdc453d99c4883ad6e6d';
+const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8';
 
 export default function NavigationScreen() {
     const location = useLocation();
