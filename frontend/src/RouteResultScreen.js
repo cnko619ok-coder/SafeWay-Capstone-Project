@@ -17,20 +17,7 @@ export default function RouteResultScreen({ userUid }) {
     const { routeData, searchData, pathPoints } = location.state || {};
     const [map, setMap] = useState(null); 
 
-    // 지도가 로드되면 경로가 꽉 차게 보이도록 자동 줌인/줌아웃
-    useEffect(() => {
-        if (map && safePath.length > 0) {
-            const bounds = new window.kakao.maps.LatLngBounds();
-            safePath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            map.setBounds(bounds, 80); 
-        }
-    }, [map, safePath]);
-
-
-     const { safety, shortest } = routeData;
-
-     // 1. 안전 경로 (실제 계산된 경로)
+    // 1. 안전 경로 (실제 계산된 경로)
     const safePath = pathPoints && pathPoints.length > 0 ? pathPoints : [
         { lat: 37.5668, lng: 126.9790 }, { lat: 37.5672, lng: 126.9794 }
     ];
@@ -40,6 +27,21 @@ export default function RouteResultScreen({ userUid }) {
         lat: p.lat - 0.0005, // 살짝 아래로 이동
         lng: p.lng + 0.0005  // 살짝 오른쪽으로 이동
     }));
+
+    // 지도가 로드되면 경로가 꽉 차게 보이도록 자동 줌인/줌아웃
+    useEffect(() => {
+        if (map && safePath.length > 0) {
+            const bounds = new window.kakao.maps.LatLngBounds();
+            safePath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+            shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+            map.setBounds(bounds, 80); 
+        }
+    }, [map, safePath, shortestPath]);
+
+
+     const { safety, shortest } = routeData;
+
+     
 
     if (!routeData) {
         return (
