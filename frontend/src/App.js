@@ -18,6 +18,7 @@ import ReportDetailScreen from './ReportDetailScreen';
 import ProfileEditScreen from './ProfileEditScreen';
 import NotificationSettingsScreen from './NotificationSettingsScreen';
 import AccountSettingsScreen from './AccountSettingsScreen';
+import NavigationScreen from './NavigationScreen';
 
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'any';
 
@@ -115,6 +116,12 @@ function App() {
                 <Route 
                     path="/profile/edit" 
                     element={isLoggedIn ? <ProfileEditScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                />
+
+                {/* 🚨 주행 안내 화면 라우트 추가 */}
+                <Route 
+                    path="/navigation" 
+                    element={isLoggedIn ? <NavigationScreen /> : <Navigate to="/login" />} 
                 />
 
                 {/* 🚨 설정 화면 라우트 추가 */}

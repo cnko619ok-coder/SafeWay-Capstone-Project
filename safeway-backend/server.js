@@ -319,9 +319,55 @@ app.get('/api/reports', async (req, res) => {
     }
 });
 
+// 3. [개인] 내 신고 내역 조회 (마이페이지용) -> 내 글만 보임
+app.get('/api/reports/user/:uid', async (req, res) => {
+    try {
+        // 🚨 인덱스 오류 방지를 위해 orderBy 제거 (단순 필터링만 사용)
+        const snapshot = await db.collection('reports').where('uid', '==', req.params.uid).get();
+        
+        const reports = snapshot.docs.map(doc => ({
+            id: doc.id, ...doc.data(),
+            createdAt: doc.data().createdAt ? doc.data().createdAt.toDate() : new Date()
+        }));
+        res.status(200).json(reports);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // =======================================================
 //           E. 사용자 프로필 및 통계 API (신규 추가)
 // =======================================================
+
+app.get('/api/users/:uid', async (req, res) => {
+    try {
+        const userDoc = await db.collection('users').doc(req.params.uid).get();
+        if (!userDoc.exists) return res.status(404).json({ error: '사용자 없음' });
+        
+        // 통계 계산
+        const reportsSnapshot = await db.collection('reports').where('uid', '==', req.params.uid).get();
+        const historySnapshot = await db.collection('users').doc(req.params.uid).collection('history').get();
+        
+        res.json({ 
+            ...userDoc.data(),
+            stats: {
+                reportCount: reportsSnapshot.size,
+                safeReturnCount: historySnapshot.size,
+                usageTime: '12시간'
+            }
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/users/:uid', requireAuth, async (req, res) => {
+    const { name, phone, address, profileImage } = req.body;
+    try {
+        await db.collection('users').doc(req.params.uid).update({
+            name, phone: phone || '', address: address || '',
+            ...(profileImage && { profileImage }),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        res.json({ message: '수정 완료' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // 1. 즐겨찾기 등록
 app.post('/api/favorites', requireAuth, async (req, res) => {
