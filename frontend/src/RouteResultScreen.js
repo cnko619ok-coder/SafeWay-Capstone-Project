@@ -7,17 +7,20 @@ import { Shield, Clock, MapPin, Navigation, Camera, Lightbulb, ChevronLeft, Aler
 import { Map, MapMarker, Polyline } from 'react-kakao-maps-sdk';
 
 const KAKAO_APP_KEY = '15b6d60e4095cdc453d99c4883ad6e6d'; 
+// 🚨 ngrok 주소 확인 (바뀌었다면 수정 필요)
 const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
 
 export default function RouteResultScreen({ userUid }) {
     const location = useLocation();
     const navigate = useNavigate();
     
+    // 1. 데이터 가져오기
     const { routeData, searchData, pathPoints } = location.state || {};
-    const [map, setMap] = useState(null); 
+    const [map, setMap] = useState(null);
     const [isSheetOpen, setIsSheetOpen] = useState(true);
 
-    // 1. 지도 경로 설정
+    // 2. 경로 변수 선언 (Hook 실행을 위해 최상단에 배치)
+    // 안전 경로 (실제 계산된 경로)
     const safePath = pathPoints && pathPoints.length > 0 ? pathPoints : [
         { lat: 37.5668, lng: 126.9790 }, { lat: 37.5672, lng: 126.9794 }
     ];
@@ -26,7 +29,7 @@ export default function RouteResultScreen({ userUid }) {
     // 균형 경로 (비교용 가상 경로 - 약간 아래로)
     const balancedPath = safePath.map(p => ({ lat: p.lat - 0.0004, lng: p.lng + 0.0004 }));
 
-    // 2. 지도 자동 줌
+    // 3. 지도 자동 줌 (useEffect)
     useEffect(() => {
         if (map && safePath.length > 0) {
             const bounds = new window.kakao.maps.LatLngBounds();
@@ -35,9 +38,17 @@ export default function RouteResultScreen({ userUid }) {
             // 패널이 열려있을 때 지도가 가려지는 것을 고려해 아래쪽 여백(padding)을 줌
             map.setBounds(bounds, 80, 0, 0, 300); 
         }
-    }, [map, safePath]);
+    }, [map, safePath, shortestPath]);
 
-    if (!routeData) return <div className="min-h-screen flex items-center justify-center p-4">데이터 없음 <Link to="/" className="ml-2 text-blue-500">홈으로</Link></div>;
+    // 4. 데이터 없음 예외 처리 (Hook 선언 후)
+    if (!routeData) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4">
+                <p className="text-gray-600 mb-4">데이터가 없습니다.</p>
+                <Link to="/" className="text-blue-500 font-bold underline">홈으로 돌아가기</Link>
+            </div>
+        );
+    }
 
     const { safety, shortest, balanced } = routeData;
 
@@ -50,8 +61,12 @@ export default function RouteResultScreen({ userUid }) {
             if (userUid) {
                 try {
                     await axios.post(`${API_BASE_URL}/api/history`, {
-                        uid: userUid, start: searchData.start, end: searchData.end,
-                        score: selectedRoute.score, distance: selectedRoute.distance, time: selectedRoute.time,
+                        uid: userUid, 
+                        start: searchData.start, 
+                        end: searchData.end,
+                        score: selectedRoute.score, 
+                        distance: selectedRoute.distance, 
+                        time: selectedRoute.time,
                         date: new Date().toLocaleDateString()
                     });
                 } catch (e) { console.error(e); }
@@ -73,6 +88,8 @@ export default function RouteResultScreen({ userUid }) {
                 <Map center={safePath[0]} style={{ width: "100%", height: "100%" }} level={3} appkey={KAKAO_APP_KEY} onCreate={setMap}>
                     <MapMarker position={safePath[0]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", size: {width: 40, height: 40}}}/>
                     <MapMarker position={safePath[safePath.length-1]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", size: {width: 40, height: 40}}}/>
+                    
+                    {/* 경로 선들 */}
                     <Polyline path={[safePath]} strokeWeight={7} strokeColor={"#10b981"} strokeOpacity={0.9} />
                     <Polyline path={[shortestPath]} strokeWeight={5} strokeColor={"#f59e0b"} strokeOpacity={0.7} strokeStyle={"shortdash"} />
                     <Polyline path={[balancedPath]} strokeWeight={5} strokeColor={"#eab308"} strokeOpacity={0.7} strokeStyle={"shortdot"} />
@@ -99,59 +116,69 @@ export default function RouteResultScreen({ userUid }) {
                     </div>
                 </div>
 
-                {/* 🚨 스크롤 가능한 상세 내용 (이미지 디자인 반영) 🚨 */}
+                {/* 상세 내용 (스크롤 가능) */}
                 <div className="flex-1 overflow-y-auto p-6 bg-gray-50 font-sans">
                     
-                    {/* 3. 거리 & 시간 비교 (막대 그래프) */}
+                    
+                    {/* 그래프 비교 */}
                     <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-6">
-                        <h3 className="font-bold text-gray-800 mb-4 flex items-center"><MapPin className="w-5 h-5 mr-2 text-green-500"/> 거리 비교</h3>
+                        <h3 className="font-bold text-gray-800 mb-4 flex items-center"><MapPin className="w-4 h-4 mr-2 text-blue-500"/> 거리 비교</h3>
                         <BarChart label="안전" value={safety.distance} max={maxDist} color="bg-green-500" />
                         <BarChart label="최단" value={shortest.distance} max={maxDist} color="bg-orange-400" />
                         <BarChart label="균형" value={balanced.distance} max={maxDist} color="bg-yellow-400" />
 
                         <div className="border-t border-gray-100 my-5"></div>
 
-                        <h3 className="font-bold text-gray-800 mb-4 flex items-center"><Clock className="w-5 h-5 mr-2 text-purple-500"/> 소요 시간 비교</h3>
+                        <h3 className="font-bold text-gray-800 mb-4 flex items-center"><Clock className="w-4 h-4 mr-2 text-purple-500"/> 소요 시간 비교</h3>
                         <BarChart label="안전" value={safety.time} max={maxTime} color="bg-green-500" />
                         <BarChart label="최단" value={shortest.time} max={maxTime} color="bg-orange-400" />
                         <BarChart label="균형" value={balanced.time} max={maxTime} color="bg-yellow-400" />
                     </div>
-                    
-                    {/* 1. 안전 점수 비교 카드 (파란색 그라데이션) */}
-                    <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-3xl p-6 text-white shadow-lg mb-6 flex justify-around items-center relative overflow-hidden">
+
+                    {/* 🚨🚨🚨 [수정됨] 점수 비교 카드 (깔끔한 스타일) 🚨🚨🚨 */}
+                    <div className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-3xl p-6 text-white shadow-lg mb-6 relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-full bg-white/10 opacity-30 transform rotate-12 scale-150"></div>
-                        <div className="text-center z-10">
-                            <span className="block text-5xl font-extrabold mb-1">{safety.score}</span>
-                            <div className="text-sm font-medium opacity-90 bg-white/20 px-3 py-1 rounded-full">안전 경로</div>
+                        
+                        {/* 심플한 타이틀 (테두리 효과 제거, 크기 축소) */}
+                        <div className="flex items-center mb-5 relative z-10 opacity-90">
+                            <Shield className="w-5 h-5 mr-2 text-white"/>
+                            <span className="text-xl font-bold text-white tracking-wide">
+                                안전 점수 비교
+                            </span>
                         </div>
-                        <div className="h-12 w-[1px] bg-white/30 z-10"></div>
-                        <div className="text-center z-10 opacity-90">
-                            <span className="block text-4xl font-bold mb-1">{shortest.score}</span>
-                            <div className="text-sm font-medium opacity-80">최단 경로</div>
+
+                        <div className="flex justify-around items-center relative z-10 mt-2">
+                            <div className="text-center">
+                                <span className="block text-5xl font-extrabold mb-1 drop-shadow-md">{safety.score}</span>
+                                <div className="text-sm font-medium opacity-90 bg-white/20 px-3 py-1 rounded-full inline-block">안전 경로</div>
+                            </div>
+                            <div className="h-12 w-[1px] bg-white/30 rounded-full"></div>
+                            <div className="text-center opacity-90">
+                                <span className="block text-4xl font-bold mb-1">{shortest.score}</span>
+                                <div className="text-sm font-medium opacity-80">최단 경로</div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* 2. 상세 비교 (표 형태) */}
-                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-6">
-                        <h3 className="font-bold text-gray-800 flex items-center mb-4"><Shield className="w-5 h-5 mr-2 text-blue-500"/> 상세 비교</h3>
+                    {/* 상세 비교표 */}
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-6 space-y-2">
+                        <h3 className="font-bold text-gray-800 flex items-center mb-4"><Shield className="w-4 h-4 mr-2"/> 상세 비교</h3>
                         
-                        <div className="grid grid-cols-4 gap-2 text-center text-xs font-bold text-gray-500 bg-gray-50 p-3 rounded-xl mb-3">
-                            <div>항목</div><div className="text-green-600">안전</div><div className="text-orange-500">최단</div><div className="text-yellow-600">균형</div>
+                        <div className="grid grid-cols-4 gap-2 text-center text-xs font-bold text-gray-500 bg-gray-50 p-2 rounded-xl mb-2">
+                            <div>항목</div><div className="text-green-600">안전</div><div className="text-orange-500">최단</div><div className="text-yellow-500">균형</div>
                         </div>
                         
-                        <ComparisonRow label="CCTV" icon={Camera} color="text-blue-500" v1={`${safety.cctv}개`} v2={`${shortest.cctv}개`} v3={`${balanced.cctv}개`} />
+                        {/* 아이콘 옆에 텍스트가 항상 나오도록 수정됨 */}
+                        <ComparisonRow label="CCTV" icon={Camera} color="text-blue-500" v1={safety.cctv} v2={shortest.cctv} v3={balanced.cctv} />
                         <div className="border-t border-gray-50 my-2"></div>
-                        <ComparisonRow label="가로등" icon={Lightbulb} color="text-yellow-500" v1={`${safety.lights}개`} v2={`${shortest.lights}개`} v3={`${balanced.lights}개`} />
+                        <ComparisonRow label="가로등" icon={Lightbulb} color="text-yellow-500" v1={safety.lights} v2={shortest.lights} v3={balanced.lights} />
                         <div className="border-t border-gray-50 my-2"></div>
-                        <ComparisonRow label="위험신고" icon={AlertTriangle} color="text-red-500" v1={`${safety.reports || 0}건`} v2={`${shortest.reports || 0}건`} v3={`${balanced.reports || 0}건`} isDanger={true} />
-                    </div>
-
-                    
+                        <ComparisonRow label="위험신고" icon={AlertTriangle} color="text-red-500" v1={`${safety.reports || 0}건`} v2={`${shortest.reports || 0}건`} v3={`${balanced.reports || 0}건`} isDanger={true} /></div>
 
                     {/* 안내 시작 버튼들 */}
                     <div className="space-y-3 mb-10">
                         <button onClick={() => handleStartNavigation('safety')} className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold shadow-md hover:bg-green-700 transition flex items-center justify-center active:scale-95">
-                            <Navigation className="w-5 h-5 mr-2" /> 안전 경로로 안내 시작
+                            <Navigation className="w-5 h-5 mr-2" /> 안전 경로 안내 시작
                         </button>
                         <div className="flex gap-3">
                             <button onClick={() => handleStartNavigation('shortest')} className="flex-1 bg-white border-2 border-gray-200 text-gray-600 py-3.5 rounded-2xl font-bold hover:bg-gray-50 transition active:scale-95">최단 경로</button>
@@ -179,16 +206,16 @@ function BarChart({ label, value, max, color }) {
     );
 }
 
-// 📋 상세 비교 행 컴포넌트
+// 📋 상세 비교 행 컴포넌트 (텍스트 항상 표시)
 function ComparisonRow({ label, icon: Icon, color, v1, v2, v3, isDanger }) {
     return (
         <div className="grid grid-cols-4 gap-2 text-center items-center py-2">
             <div className={`flex items-center justify-center text-xs ${color} font-bold`}>
-                <Icon className="w-4 h-4 mr-1.5" /> <span className="hidden sm:inline">{label}</span>
+                <Icon className="w-3.5 h-3.5 mr-1" /> {label}
             </div>
             <div className={`text-sm font-bold ${isDanger && v1 !== '0건' ? 'text-red-600' : 'text-gray-800'}`}>{v1}</div>
-            <div className={`text-sm text-gray-600`}>{v2}</div>
-            <div className={`text-sm text-gray-600`}>{v3}</div>
+            <div className="text-sm text-gray-600">{v2}</div>
+            <div className="text-sm text-gray-600">{v3}</div>
         </div>
     );
 }
