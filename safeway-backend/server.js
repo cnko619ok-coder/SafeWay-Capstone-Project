@@ -319,6 +319,90 @@ app.get('/api/reports', async (req, res) => {
     }
 });
 
+// =======================================================
+//           E. 사용자 프로필 및 통계 API (신규 추가)
+// =======================================================
+
+// 1. 즐겨찾기 등록
+app.post('/api/favorites', requireAuth, async (req, res) => {
+    const { uid, name, address } = req.body;
+    if (!name || !address) return res.status(400).json({ error: '정보 누락' });
+
+    try {
+        await db.collection('users').doc(uid).collection('favorites').add({
+            name, address, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        res.status(201).json({ message: '즐겨찾기 등록 성공' });
+    } catch (error) {
+        res.status(500).json({ error: '등록 실패' });
+    }
+});
+
+// 2. 즐겨찾기 조회
+app.get('/api/favorites/:uid', async (req, res) => {
+    try {
+        const snap = await db.collection('users').doc(req.params.uid).collection('favorites').orderBy('createdAt', 'desc').get();
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        res.status(200).json(list);
+    } catch (error) {
+        res.status(500).json({ error: '조회 실패' });
+    }
+});
+
+// 3. 즐겨찾기 삭제
+app.post('/api/favorites/delete', requireAuth, async (req, res) => {
+    const { uid, favoriteId } = req.body;
+    try {
+        await db.collection('users').doc(uid).collection('favorites').doc(favoriteId).delete();
+        res.status(200).json({ message: '삭제 성공' });
+    } catch (error) {
+        res.status(500).json({ error: '삭제 실패' });
+    }
+});
+
+// =======================================================
+//           F. 귀가 기록 관리 API (신규 추가)
+// =======================================================
+
+// 1. 귀가 기록 저장 (POST)
+app.post('/api/history', requireAuth, async (req, res) => {
+    const { uid, start, end, score, distance, time, date } = req.body;
+    
+    if (!start || !end) return res.status(400).json({ error: '출발지/도착지 누락' });
+
+    try {
+        await db.collection('users').doc(uid).collection('history').add({
+            start, end, score, distance, time,
+            date: date || new Date().toISOString().split('T')[0], // 날짜 (YYYY-MM-DD)
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        
+        // (선택) 사용자의 총 안전 귀가 횟수 +1 증가
+        const userRef = db.collection('users').doc(uid);
+        await userRef.update({
+            'stats.safeReturnCount': admin.firestore.FieldValue.increment(1)
+        });
+
+        res.status(201).json({ message: '귀가 기록 저장 성공' });
+    } catch (error) {
+        res.status(500).json({ error: '기록 저장 실패: ' + error.message });
+    }
+});
+
+// 2. 귀가 기록 목록 조회 (GET)
+app.get('/api/history/:uid', async (req, res) => {
+    try {
+        const snapshot = await db.collection('users').doc(req.params.uid)
+                                .collection('history')
+                                .orderBy('createdAt', 'desc').get();
+                                
+        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        res.status(200).json(list);
+    } catch (error) {
+        res.status(500).json({ error: '조회 실패' });
+    }
+});
+
 // D. 실행
 app.listen(port, () => {
   console.log(`Backend Server listening at http://localhost:${port}`);

@@ -15,6 +15,9 @@ import SOSScreen from './SOSScreen';
 import MyReportsScreen from './MyReportsScreen';
 import ReturnHistoryScreen from './ReturnHistoryScreen';
 import ReportDetailScreen from './ReportDetailScreen';
+import ProfileEditScreen from './ProfileEditScreen';
+import NotificationSettingsScreen from './NotificationSettingsScreen';
+import AccountSettingsScreen from './AccountSettingsScreen';
 
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'any';
 
@@ -66,13 +69,13 @@ function App() {
                 {/* 🚨🚨🚨 경로 검색 라우트 추가 */}
                 <Route 
                   path="/route/search" 
-                  element={isLoggedIn ? <RouteSearchScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                  element={isLoggedIn ? <RouteSearchScreen userUid={userUid} /> : <Navigate to="/login" />}
                 />
         
                 {/* 🚨🚨🚨 경로 결과 라우트 추가 */}
                 <Route 
-                  path="/route/result" 
-                  element={isLoggedIn ? <RouteResultScreen /> : <Navigate to="/login" />} 
+                   path="/route/result" 
+                    element={isLoggedIn ? <RouteResultScreen userUid={userUid} /> : <Navigate to="/login" />} 
                 />
                 
                 {/* 🚨🚨🚨 위험 지역 게시판 라우트 연결 (수정됨) */}
@@ -88,9 +91,16 @@ function App() {
                 />
 
                 {/* 🚨 상세 화면 라우트 추가 */}
-                <Route path="/profile/reports" element={isLoggedIn ? <MyReportsScreen /> : <Navigate to="/login" />} />
-                <Route path="/profile/history" element={isLoggedIn ? <ReturnHistoryScreen /> : <Navigate to="/login" />} />
-                <Route path="/report-board/:id" element={isLoggedIn ? <ReportDetailScreen userUid={userUid} /> : <Navigate to="/login" />} />
+                <Route 
+                    path="/profile/reports" 
+                    element={isLoggedIn ? <MyReportsScreen /> : <Navigate to="/login" />} />
+                <Route 
+                    path="/profile/history" 
+                    element={isLoggedIn ? <ReturnHistoryScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                /> 
+                <Route 
+                    path="/report-board/:id" 
+                    element={isLoggedIn ? <ReportDetailScreen userUid={userUid} /> : <Navigate to="/login" />} />
 
                 {/* 🚨 SOS 화면 라우트 추가 */}
                 <Route 
@@ -100,6 +110,21 @@ function App() {
                 
                 {/* 기본 접속 시 /login으로 이동 */}
                 <Route path="*" element={<Navigate to="/login" />} />
+
+                {/* 🚨 프로필 수정 화면 추가 */}
+                <Route 
+                    path="/profile/edit" 
+                    element={isLoggedIn ? <ProfileEditScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                />
+
+                {/* 🚨 설정 화면 라우트 추가 */}
+                <Route 
+                    path="/profile/notifications" 
+                    element={isLoggedIn ? <NotificationSettingsScreen /> : <Navigate to="/login" />} />
+                <Route 
+                    path="/profile/account" 
+                    element={isLoggedIn ? <AccountSettingsScreen /> : <Navigate to="/login" />} />
+
             </Routes>
             </div>
             {/* 🚨 로그인 상태일 때만 하단 메뉴바 표시 (모든 화면 공통) */}
