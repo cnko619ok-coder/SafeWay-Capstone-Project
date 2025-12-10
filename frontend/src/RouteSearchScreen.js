@@ -95,18 +95,18 @@ export default function RouteSearchScreen() {
     const searchAddressToCoordinate = (address) => {
         return new Promise((resolve, reject) => {
             if (!window.kakao || !window.kakao.maps || !window.kakao.maps.services) {
-                reject(new Error("카카오맵 SDK가 로드되지 않았습니다."));
+                // 🚨 에러 1: SDK 로드 실패
+                reject(new Error("카카오맵이 아직 로딩되지 않았습니다. 잠시 후 다시 시도해주세요."));
                 return;
             }
             const geocoder = new window.kakao.maps.services.Geocoder();
             geocoder.addressSearch(address, (result, status) => {
                 if (status === window.kakao.maps.services.Status.OK) {
-                    resolve({
-                        lat: parseFloat(result[0].y),
-                        lng: parseFloat(result[0].x),
-                    });
+                    resolve({ lat: parseFloat(result[0].y), lng: parseFloat(result[0].x) });
                 } else {
-                    reject(new Error(`'${address}' 검색 실패`));
+                    // 🚨 에러 2: 검색 결과 없음 (ZERO_RESULT) 또는 에러 (ERROR)
+                    // status 값을 알림창에 띄워서 확인합니다.
+                    reject(new Error(`검색 실패 (상태코드: ${status}) - 정확한 주소를 입력했는지 확인해주세요.`));
                 }
             });
         });
