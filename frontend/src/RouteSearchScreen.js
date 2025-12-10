@@ -50,6 +50,7 @@ export default function RouteSearchScreen() {
     const [startLocation, setStartLocation] = useState('');
     const [endLocation, setEndLocation] = useState('');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     const navigate = useNavigate(); 
     const [searchResult, setSearchResult] = useState(null);
     const [calculatedPath, setCalculatedPath] = useState([]);
@@ -133,9 +134,12 @@ export default function RouteSearchScreen() {
     const handleSearch = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setError(null);
         setSearchResult(null);
 
-        if (endLocation.trim()) setRecentDestinations(prev => [{ name: endLocation, address: '최근 검색' }, ...prev.filter(d => d.name !== endLocation)].slice(0, 5));
+        if (endLocation.trim()) {
+            setRecentDestinations(prev => [{ name: endLocation, address: '최근 검색' }, ...prev.filter(d => d.name !== endLocation)].slice(0, 5));
+        }
 
         try {
             let pathPoints = [];
@@ -146,7 +150,7 @@ export default function RouteSearchScreen() {
                 
                 pathPoints = [
                     startCoords,
-                    { lat: (startCoords.lat + endCoords.lat) / 2, lng: (startCoords.lng + endCoords.lng) / 2 }, 
+                    //{ lat: (startCoords.lat + endCoords.lat) / 2, lng: (startCoords.lng + endCoords.lng) / 2 }, 
                     endCoords
                 ];
             } catch (geoError) {
@@ -163,14 +167,13 @@ export default function RouteSearchScreen() {
             // 🚨🚨🚨 [수정] 백엔드 분석 API 호출 🚨🚨🚨
             // 이제 pathPoints 배열이 아니라 start, end 객체를 보냅니다.
             const response = await axios.post(`${API_BASE_URL}/api/route/analyze`, {
-                start: startCoords,
-                end: endCoords
+                start: pathPoints[0],
+                end: pathPoints[pathPoints.length - 1]
             });
             
             // 백엔드에서 완성된 3가지 데이터를 받음
             const { safety, shortest, balanced } = response.data;
 
-            
             
                  setSearchResult({
                 safety,
@@ -189,7 +192,8 @@ export default function RouteSearchScreen() {
     const goToMapScreen = () => navigate('/route/result', { 
         state: { 
             searchData: { start: startLocation, end: endLocation }, 
-            pathPoints: calculatedPath, 
+            // 🚨 calculatedPath가 비어있을 수 있으므로 안전장치 추가
+            pathPoints: calculatedPath.length > 0 ? calculatedPath : DUMMY_PATH, 
             routeData: searchResult 
         } 
     });

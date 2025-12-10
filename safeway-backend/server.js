@@ -141,14 +141,16 @@ async function getKakaoRoute(start, end, priority) {
     });
 
     const summary = response.data.routes[0].summary;
-    const roads = response.data.routes[0].sections[0].roads;
+    const sections = response.data.routes[0].sections;
     
     // 지도에 그릴 좌표 배열로 변환
     let path = [];
-    roads.forEach(r => {
-        for (let i=0; i<r.vertexes.length; i+=2) {
-            path.push({ lng: r.vertexes[i], lat: r.vertexes[i+1] });
-        }
+    sections.forEach(section => {
+        section.roads.forEach(r => {
+            for (let i=0; i<r.vertexes.length; i+=2) {
+                path.push({ lng: r.vertexes[i], lat: r.vertexes[i+1] });
+            }
+        });
     });
 
     return { path, distance: summary.distance, duration: summary.duration };
