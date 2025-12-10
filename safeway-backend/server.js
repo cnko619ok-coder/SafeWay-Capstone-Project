@@ -254,17 +254,17 @@ app.post('/api/favorites/delete', requireAuth, async (req, res) => {
 // =======================================================
 //           G. 카카오 모빌리티 길찾기 API (신규)
 // =======================================================
-app.post('/api/route/kakao', async (req, res) => {
-    const { origin, destination, waypoints } = req.body;
-
+app.post('/api/route/directions', async (req, res) => {
+    const { start, end } = req.body;
     // 카카오 API 요청 주소
-    const url = "https://apis-navi.kakaomobility.com/v1/waypoints/directions";
+    
+    if (!start || !end) return res.status(400).json({ error: '좌표 누락' });
 
     try {
+        const url = "https://apis-navi.kakaomobility.com/v1/waypoints/directions";
         const response = await axios.post(url, {
-            origin: origin,       // 출발지 { x, y }
-            destination: destination, // 도착지 { x, y }
-            waypoints: waypoints || [], // 경유지 (선택)
+            origin: { x: start.lng, y: start.lat },
+            destination: { x: end.lng, y: end.lat },
             priority: "RECOMMEND", // 추천 경로
             car_fuel: "GASOLINE",
             car_hipass: false,
@@ -277,16 +277,14 @@ app.post('/api/route/kakao', async (req, res) => {
             }
         });
 
-        // 경로 데이터 중 '선(Line)'을 그리기 위한 좌표 추출
-        // 카카오 데이터는 [lng, lat] 순서라 [lat, lng]으로 변환 필요할 수 있음
+        // 카카오가 준 경로 데이터(routes)를 지도에 그릴 수 있는 좌표 배열로 변환
         const sections = response.data.routes[0].sections;
-        let pathCoordinates = [];
+        let realPath = [];
 
         sections.forEach(section => {
             section.roads.forEach(road => {
-                // vertexes는 [x, y, x, y...] 형태로 되어 있음
                 for (let i = 0; i < road.vertexes.length; i += 2) {
-                    pathCoordinates.push({
+                    realPath.push({
                         lng: road.vertexes[i],
                         lat: road.vertexes[i + 1]
                     });
@@ -294,18 +292,18 @@ app.post('/api/route/kakao', async (req, res) => {
             });
         });
 
-        // 🚨 거리와 시간 정보도 추출
+        // 실제 거리와 시간 정보도 추출
         const summary = response.data.routes[0].summary;
         
         res.status(200).json({ 
-            path: pathCoordinates, // 지도에 그릴 선
-            distance: summary.distance, // 미터 단위
-            duration: summary.duration  // 초 단위
+            path: realPath, // 실제 도로 경로
+            distance: summary.distance, 
+            duration: summary.duration 
         });
 
     } catch (error) {
-        console.error("카카오 길찾기 실패:", error.response?.data || error.message);
-        res.status(500).json({ error: "길찾기 API 호출 실패" });
+        console.error("길찾기 실패:", error.response?.data || error.message);
+        res.status(500).json({ error: "길찾기 실패" });
     }
 });
 
