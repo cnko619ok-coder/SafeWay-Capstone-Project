@@ -44,17 +44,39 @@ export default function RouteResultScreen({ userUid }) {
     const shortestPath = generateMockRoute(rawPath, 0.0003, -0.0003); // 약간 다르게
     const balancedPath = generateMockRoute(rawPath, -0.0003, 0.0003); // 약간 다르게
 
-    // 🚨 3. 지도 자동 줌 및 여백 설정 (하단 가림 방지)
+    const [realPath, setRealPath] = useState([]); // 🚨 실제 경로 저장할 상태
+
+    // 🚨 화면이 켜지면 백엔드에 '실제 경로' 요청
     useEffect(() => {
-        if (map && safePath.length > 0) {
-            const bounds = new window.kakao.maps.LatLngBounds();
-            safePath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            
-            // 🚨 Padding 설정: (상, 우, 하, 좌) -> 하단 300px 여백으로 중심을 위로 올림
-            map.setBounds(bounds, 50, 20, 300, 20); 
-        }
-    }, [map, safePath]);
+        const fetchRealRoute = async () => {
+            if (!searchData || !pathPoints) return;
+
+            try {
+                // 카카오 API는 { x: 경도, y: 위도 } 형식을 씁니다.
+                // pathPoints[0]은 출발지, pathPoints[마지막]은 도착지
+                const start = pathPoints[0];
+                const end = pathPoints[pathPoints.length - 1];
+
+                const response = await axios.post(`${API_BASE_URL}/api/route/kakao`, {
+                    origin: { x: start.lng, y: start.lat },
+                    destination: { x: end.lng, y: end.lat },
+                    // 중간 경유지가 있다면 여기에 추가
+                    // waypoints: [...] 
+                });
+
+                // 받아온 리얼 경로로 업데이트!
+                setRealPath(response.data.path);
+                console.log("✅ 실제 도로 경로 로드 완료!");
+
+            } catch (err) {
+                console.error("실제 경로 로드 실패 (가상 경로 사용):", err);
+                // 실패하면 기존 가상 경로(safePath) 그대로 사용
+                setRealPath(safePath); 
+            }
+        };
+
+        fetchRealRoute();
+    }, []);
 
     // 4. 데이터 없음 예외 처리 (Hook 선언 후)
     if (!routeData) {
