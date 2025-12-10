@@ -5,8 +5,10 @@ import axios from 'axios';
 import { Search, MapPin, ArrowLeft, Navigation, Map as MapIcon, Crosshair, Star, X, MinusCircle, Shield, Clock, Camera, Lightbulb, Scale } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
+// 🚨 ngrok 주소 확인 (바뀌었다면 수정 필요)
 const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
 
+// 로컬 환경 백업용 가상 경로
 const DUMMY_PATH = [
   { lat: 37.5668, lng: 126.9790 }, { lat: 37.5670, lng: 126.9792 }, { lat: 37.5672, lng: 126.9794 }, 
 ];
@@ -49,7 +51,6 @@ export default function RouteSearchScreen() {
     const [endLocation, setEndLocation] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate(); 
-    
     const [searchResult, setSearchResult] = useState(null);
     const [calculatedPath, setCalculatedPath] = useState([]);
 
@@ -62,7 +63,7 @@ export default function RouteSearchScreen() {
 
     const handleAddFavorite = () => {
         if (!endLocation) return alert("도착지를 먼저 입력해주세요.");
-        const name = prompt("별명 입력");
+        const name = prompt("이 장소의 별명을 입력해주세요 (예: 헬스장, 학교)");
         if (name) setFavorites([{ id: Date.now(), name, address: endLocation }, ...favorites]);
     };
     const handleDeleteFavorite = (id, e) => { e.stopPropagation(); if(window.confirm("삭제하시겠습니까?")) setFavorites(favorites.filter(fav => fav.id !== id)); };
@@ -92,21 +93,38 @@ export default function RouteSearchScreen() {
         );
     };
 
-    const searchAddressToCoordinate = (address) => {
+    // 🚨🚨🚨 [수정] 장소 검색(Keyword Search) 기능으로 변경 🚨🚨🚨
+    const searchAddressToCoordinate = (keyword) => {
         return new Promise((resolve, reject) => {
             if (!window.kakao || !window.kakao.maps || !window.kakao.maps.services) {
-                // 🚨 에러 1: SDK 로드 실패
-                reject(new Error("카카오맵이 아직 로딩되지 않았습니다. 잠시 후 다시 시도해주세요."));
+                reject(new Error("카카오맵이 아직 로딩되지 않았습니다."));
                 return;
             }
-            const geocoder = new window.kakao.maps.services.Geocoder();
-            geocoder.addressSearch(address, (result, status) => {
+
+            // 1. 장소 검색 객체 생성
+            const ps = new window.kakao.maps.services.Places();
+
+            // 2. 키워드로 검색 (예: "강남역", "스타벅스")
+            ps.keywordSearch(keyword, (data, status) => {
                 if (status === window.kakao.maps.services.Status.OK) {
-                    resolve({ lat: parseFloat(result[0].y), lng: parseFloat(result[0].x) });
+                    // 검색 결과 중 첫 번째 장소의 좌표 사용
+                    resolve({
+                        lat: parseFloat(data[0].y),
+                        lng: parseFloat(data[0].x),
+                    });
                 } else {
-                    // 🚨 에러 2: 검색 결과 없음 (ZERO_RESULT) 또는 에러 (ERROR)
-                    // status 값을 알림창에 띄워서 확인합니다.
-                    reject(new Error(`검색 실패 (상태코드: ${status}) - 정확한 주소를 입력했는지 확인해주세요.`));
+                    // 장소 검색 실패 시, 주소 검색으로 재시도 (혹시 모르니)
+                    const geocoder = new window.kakao.maps.services.Geocoder();
+                    geocoder.addressSearch(keyword, (result, addrStatus) => {
+                        if (addrStatus === window.kakao.maps.services.Status.OK) {
+                             resolve({
+                                lat: parseFloat(result[0].y),
+                                lng: parseFloat(result[0].x),
+                            });
+                        } else {
+                             reject(new Error(`'${keyword}' 검색 실패 (결과 없음)`));
+                        }
+                    });
                 }
             });
         });
@@ -122,7 +140,7 @@ export default function RouteSearchScreen() {
         try {
             let pathPoints = [];
             try {
-                // 🚨 좌표 변환 시도
+                // 🚨 장소 이름으로 좌표 찾기
                 const startCoords = await searchAddressToCoordinate(startLocation);
                 const endCoords = await searchAddressToCoordinate(endLocation);
                 
@@ -131,12 +149,10 @@ export default function RouteSearchScreen() {
                     { lat: (startCoords.lat + endCoords.lat) / 2, lng: (startCoords.lng + endCoords.lng) / 2 }, 
                     endCoords
                 ];
-                // 🚨 성공 알림 (테스트용)
-                // alert(`✅ 좌표 변환 성공!\n출발: ${startCoords.lat}, ${startCoords.lng}\n도착: ${endCoords.lat}, ${endCoords.lng}`);
-
             } catch (geoError) {
-                // 🚨 실패 알림 (원인 파악용)
-                alert(`⚠️ 지도 오류 발생: ${geoError.message}\n(가상 데이터로 대체합니다)`);
+                console.warn("지도 API 실패:", geoError);
+                // 실패 시 알림 띄우고 가상 데이터 사용
+                alert(`⚠️ ${geoError.message}\n(가상 경로로 대체합니다)`);
                 pathPoints = DUMMY_PATH;
                 if (!startLocation) setStartLocation('서울 시청');
                 if (!endLocation) setEndLocation('강남역');
@@ -194,12 +210,12 @@ export default function RouteSearchScreen() {
                 <form onSubmit={handleSearch} className="bg-white p-5 rounded-3xl shadow-sm space-y-4">
                     <div className="relative group">
                         <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-blue-500" />
-                        <input type="text" placeholder="출발지 입력" value={startLocation} onChange={(e) => setStartLocation(e.target.value)} className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-800 outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                        <input type="text" placeholder="출발지 (예: 서울역)" value={startLocation} onChange={(e) => setStartLocation(e.target.value)} className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-800 outline-none focus:bg-white focus:border-blue-500 transition-all" />
                         <button type="button" onClick={handleCurrentLocation} className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 text-blue-500 hover:bg-blue-50 rounded-full transition-colors"><Crosshair className="w-5 h-5" /></button>
                     </div>
                     <div className="relative group">
                         <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-red-500" />
-                        <input type="text" placeholder="도착지 입력" value={endLocation} onChange={(e) => setEndLocation(e.target.value)} className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-800 outline-none focus:bg-white focus:border-red-500 transition-all" />
+                        <input type="text" placeholder="도착지 (예: 강남역)" value={endLocation} onChange={(e) => setEndLocation(e.target.value)} className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-gray-800 outline-none focus:bg-white focus:border-red-500 transition-all" />
                         <button type="button" onClick={handleAddFavorite} className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 text-yellow-400 hover:text-yellow-500 hover:bg-yellow-50 rounded-full transition-colors"><Star className="w-5 h-5 fill-current" /></button>
                     </div>
                     <button type="submit" disabled={loading} className="w-full mt-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center">
@@ -207,15 +223,18 @@ export default function RouteSearchScreen() {
                     </button>
                 </form>
 
+                {/* 하단 영역: 검색 결과 유무에 따라 변경 */}
                 {!searchResult ? (
                     <>
+                        {/* 즐겨찾기 목록 */}
                         <section>
                             <div className="flex items-center justify-between mb-3 px-1">
                                 <h3 className="text-sm font-bold text-gray-700 flex items-center"><Star className="w-4 h-4 mr-1 text-yellow-500 fill-yellow-500" /> 즐겨찾기</h3>
                                 <button type="button" onClick={() => setIsEditing(!isEditing)} className="text-xs text-gray-400 hover:text-blue-600 transition-colors">{isEditing ? '완료' : '편집'}</button>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
-                                {favorites.map((fav) => (
+                                {favorites.length === 0 ? <p className="col-span-2 text-center text-gray-400 text-xs py-4">즐겨찾기가 없습니다.</p> :
+                                favorites.map((fav) => (
                                     <div key={fav.id} className="relative group">
                                         <button type="button" onClick={() => !isEditing && setEndLocation(fav.address)} className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md text-left"><div className="font-bold text-gray-800 mb-1">{fav.name}</div><div className="text-xs text-gray-400 truncate">{fav.address}</div></button>
                                         {isEditing && <button onClick={(e) => handleDeleteFavorite(fav.id, e)} className="absolute top-2 right-2 text-red-500 p-1 bg-white rounded-full shadow-sm"><MinusCircle className="w-5 h-5" /></button>}
@@ -223,6 +242,7 @@ export default function RouteSearchScreen() {
                                 ))}
                             </div>
                         </section>
+                        {/* 최근 목적지 */}
                         <section>
                             <div className="flex items-center justify-between mb-3 px-1">
                                 <h3 className="text-sm font-bold text-gray-700">최근 목적지</h3>
@@ -239,12 +259,12 @@ export default function RouteSearchScreen() {
                         </section>
                     </>
                 ) : (
+                    // 🚨 결과 리스트
                     <section className="animate-fade-in-up space-y-4">
                         <div className="flex justify-between items-center px-1">
                             <h3 className="text-lg font-bold text-gray-800">추천 경로</h3>
                             <button onClick={() => setSearchResult(null)} className="text-sm text-blue-600 font-medium">다시 검색</button>
                         </div>
-                        
                         <RouteResultCard title="안전 경로" data={searchResult.safety} color="green" icon={Shield} isBest={true} onClick={goToMapScreen} />
                         <RouteResultCard title="최단 경로" data={searchResult.shortest} color="orange" icon={Clock} onClick={goToMapScreen} />
                         <RouteResultCard title="균형 경로" data={searchResult.balanced} color="yellow" icon={Scale} onClick={goToMapScreen} />
