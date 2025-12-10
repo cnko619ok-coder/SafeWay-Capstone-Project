@@ -15,7 +15,7 @@ export default function RouteResultScreen({ userUid }) {
     const navigate = useNavigate();
     
     // 1. 데이터 가져오기
-    const { routeData, searchData, pathPoints } = location.state || {};
+    const { routeData, searchData } = location.state || {};
     const [map, setMap] = useState(null);
     const [isSheetOpen, setIsSheetOpen] = useState(true);
     const [realPath, setRealPath] = useState([]); // 🚨 실제 경로 저장할 상태
@@ -50,12 +50,9 @@ export default function RouteResultScreen({ userUid }) {
         fetchRealRoute();
     }, [pathPoints]);
 
-    // 3. 지도에 그릴 최종 경로 (진짜가 있으면 진짜, 없으면 기본)
-    const displayPath = realPath.length > 0 ? realPath : basicPath;
-    
-    // 비교 경로 (최단/균형) - 안전 경로를 기준으로 살짝 변형해서 보여줌
-    const shortestPath = displayPath.map(p => ({ lat: p.lat - 0.0004, lng: p.lng + 0.0004 }));
-    const balancedPath = displayPath.map(p => ({ lat: p.lat + 0.0003, lng: p.lng - 0.0003 }));
+    const safePath = routeData.safety.path;
+    const shortestPath = routeData.shortest.path;
+    const balancedPath = routeData.balanced.path;
 
     // 4. 지도 자동 줌
     useEffect(() => {

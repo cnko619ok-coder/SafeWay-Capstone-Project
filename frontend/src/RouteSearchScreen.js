@@ -160,34 +160,30 @@ export default function RouteSearchScreen() {
             
             setCalculatedPath(pathPoints);
 
-            const response = await axios.post(`${API_BASE_URL}/api/route/safety`, { pathPoints });
-            const { safetyScore, cctvCount, lightCount } = response.data;
+            // 🚨🚨🚨 [수정] 백엔드 분석 API 호출 🚨🚨🚨
+            // 이제 pathPoints 배열이 아니라 start, end 객체를 보냅니다.
+            const response = await axios.post(`${API_BASE_URL}/api/route/analyze`, {
+                start: startCoords,
+                end: endCoords
+            });
+            
+            // 백엔드에서 완성된 3가지 데이터를 받음
+            const { safety, shortest, balanced } = response.data;
 
-            setTimeout(() => {
+            
+            
                  setSearchResult({
-                    safety: { 
-                        ...DUMMY_ROUTE_DATA.safety, 
-                        score: safetyScore, cctv: cctvCount, lights: lightCount,
-                        distance: '2.3 km', time: '18분' 
-                    },
-                    shortest: { 
-                        ...DUMMY_ROUTE_DATA.shortest, 
-                        score: 72, cctv: Math.floor(cctvCount * 0.6), lights: Math.floor(lightCount * 0.5), 
-                        distance: '1.8 km', time: '12분' 
-                    },
-                    balanced: {
-                        ...DUMMY_ROUTE_DATA.balanced,
-                        score: 85, cctv: Math.floor(cctvCount * 0.8), lights: Math.floor(lightCount * 0.8),
-                        distance: '2.0 km', time: '15분'
-                    }
-                });
-                 setLoading(false);
-            }, 500);
+                safety,
+                shortest,
+                balanced
+            });
 
         } catch (err) { 
-            alert('검색 실패: ' + err.message); 
+            console.error(err);
+            alert('경로 분석 실패: ' + err.message); 
+        } finally {
             setLoading(false);
-        } 
+        }
     };
 
     const goToMapScreen = () => navigate('/route/result', { 

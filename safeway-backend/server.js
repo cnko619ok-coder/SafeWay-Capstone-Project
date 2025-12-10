@@ -28,7 +28,12 @@ const SEOUL_CCTV_KEY = process.env.SEOUL_CCTV_KEY;
 const CCTV_API_SERVICE = 'safeOpenCCTV'; 
 const SEOUL_CCTV_BASE_URL = 'http://openapi.seoul.go.kr:8088/';
 
-app.use(cors());
+app.use(cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning']
+}));
 app.use(express.json());
 
 // 데이터 캐싱 (할당량 절약)
@@ -78,19 +83,78 @@ app.post('/api/auth/login', async (req, res) => {
 // =======================================================
 //           B. 안전 경로 API (이게 없어서 경로 검색이 안 됐음)
 // =======================================================
+// 4. 유틸리티 함수 (거리 계산)
 function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; const φ1 = lat1 * Math.PI/180; const φ2 = lat2 * Math.PI/180;
+    const R = 6371e3; 
+    const φ1 = lat1 * Math.PI/180; const φ2 = lat2 * Math.PI/180;
     const Δφ = (lat2-lat1) * Math.PI/180; const Δλ = (lon2-lon1) * Math.PI/180;
     const a = Math.sin(Δφ/2)*Math.sin(Δφ/2) + Math.cos(φ1)*Math.cos(φ2) * Math.sin(Δλ/2)*Math.sin(Δλ/2);
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
+
+// 5. CCTV 데이터 가져오기
 async function getCCTVData() {
     try {
         const url = `${SEOUL_CCTV_BASE_URL}${SEOUL_CCTV_KEY}/json/${CCTV_API_SERVICE}/1/100/`; 
-        const response = await axios.get(url, { timeout: 5000 });
+        const response = await axios.get(url, { timeout: 3000 });
         return response.data[CCTV_API_SERVICE]?.row || [];
     } catch (error) { return []; }
 }
+
+// 6. [핵심] 경로 분석 함수 (경로 1개에 대해 점수 계산)
+async function analyzePath(pathPoints) {
+    const streetlights = cachedStreetlights; 
+    const cctvData = await getCCTVData(); 
+    
+    let totalLights = 0;
+    let totalCCTVs = 0;
+    const radius = 50; // 경로 주변 50m 탐색
+
+    // 성능 최적화를 위해 경로 포인트 샘플링 (10개씩 건너뛰며 검사)
+    for (let i = 0; i < pathPoints.length; i += 10) {
+        const point = pathPoints[i];
+        
+        const lights = streetlights.filter(l => calculateDistance(point.lat, point.lng, l.lat, l.lng) <= radius).length;
+        const cctvs = cctvData.filter(c => calculateDistance(point.lat, point.lng, c.WGSXPT, c.WGSYPT) <= radius).length;
+        
+        totalLights += lights;
+        totalCCTVs += cctvs;
+    }
+
+    // 점수 계산 (단순화된 로직)
+    let score = 60 + (totalCCTVs * 5) + (totalLights * 1);
+    score = Math.min(100, Math.max(0, score)); // 0~100점 제한
+
+    return { score, lights: totalLights, cctv: totalCCTVs };
+}
+
+// 7. [핵심] 카카오 길찾기 요청 함수
+async function getKakaoRoute(start, end, priority) {
+    const url = "https://apis-navi.kakaomobility.com/v1/waypoints/directions";
+    const response = await axios.post(url, {
+        origin: { x: start.lng, y: start.lat },
+        destination: { x: end.lng, y: end.lat },
+        priority: priority, 
+        car_fuel: "GASOLINE", car_hipass: false, alternatives: false, road_details: false
+    }, {
+        headers: { "Content-Type": "application/json", "Authorization": `KakaoAK ${KAKAO_REST_API_KEY}` }
+    });
+
+    const summary = response.data.routes[0].summary;
+    const roads = response.data.routes[0].sections[0].roads;
+    
+    // 지도에 그릴 좌표 배열로 변환
+    let path = [];
+    roads.forEach(r => {
+        for (let i=0; i<r.vertexes.length; i+=2) {
+            path.push({ lng: r.vertexes[i], lat: r.vertexes[i+1] });
+        }
+    });
+
+    return { path, distance: summary.distance, duration: summary.duration };
+}
+
+
 app.post('/api/route/safety', async (req, res) => {
     const { pathPoints } = req.body;
     const radius = 1000; 
@@ -254,56 +318,46 @@ app.post('/api/favorites/delete', requireAuth, async (req, res) => {
 // =======================================================
 //           G. 카카오 모빌리티 길찾기 API (신규)
 // =======================================================
-app.post('/api/route/directions', async (req, res) => {
-    const { start, end } = req.body;
-    // 카카오 API 요청 주소
-    
+// 🚨🚨🚨 [신규] 3가지 경로 통합 분석 API 🚨🚨🚨
+app.post('/api/route/analyze', async (req, res) => {
+    const { start, end } = req.body; // { lat, lng }
     if (!start || !end) return res.status(400).json({ error: '좌표 누락' });
 
     try {
-        const url = "https://apis-navi.kakaomobility.com/v1/waypoints/directions";
-        const response = await axios.post(url, {
-            origin: { x: start.lng, y: start.lat },
-            destination: { x: end.lng, y: end.lat },
-            priority: "SHORTEST", // 최단 경로
-            car_fuel: "GASOLINE",
-            car_hipass: false,
-            alternatives: false,
-            road_details: false
-        }, {
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `KakaoAK ${KAKAO_REST_API_KEY}`
-            }
+        console.log(`🚀 경로 분석 시작: (${start.lat},${start.lng}) -> (${end.lat},${end.lng})`);
+
+        // 1. 3가지 경로 병렬 요청 (추천, 최단, 시간우선)
+        const [safeRoute, shortestRoute, balancedRoute] = await Promise.all([
+            getKakaoRoute(start, end, "RECOMMEND"), // 안전(추천)
+            getKakaoRoute(start, end, "DISTANCE"),  // 최단(거리)
+            getKakaoRoute(start, end, "TIME")       // 균형(시간)
+        ]);
+
+        // 2. 각 경로별 안전 점수 분석
+        const safeStats = await analyzePath(safeRoute.path);
+        const shortestStats = await analyzePath(shortestRoute.path);
+        const balancedStats = await analyzePath(balancedRoute.path);
+
+        // 3. 응답 데이터 구성 함수
+        const formatData = (route, stats) => ({
+            path: route.path,
+            distance: (route.distance / 1000).toFixed(1) + " km",
+            time: Math.round(route.duration / 60) + "분",
+            score: stats.score,
+            cctv: stats.cctv,
+            lights: stats.lights,
+            reports: 0 // (나중에 신고 데이터 연동 시 추가)
         });
 
-        // 카카오가 준 경로 데이터(routes)를 지도에 그릴 수 있는 좌표 배열로 변환
-        const sections = response.data.routes[0].sections;
-        let realPath = [];
-
-        sections.forEach(section => {
-            section.roads.forEach(road => {
-                for (let i = 0; i < road.vertexes.length; i += 2) {
-                    realPath.push({
-                        lng: road.vertexes[i],
-                        lat: road.vertexes[i + 1]
-                    });
-                }
-            });
-        });
-
-        // 실제 거리와 시간 정보도 추출
-        const summary = response.data.routes[0].summary;
-        
-        res.status(200).json({ 
-            path: realPath, // 실제 도로 경로
-            distance: summary.distance, 
-            duration: summary.duration 
+        res.json({
+            safety: formatData(safeRoute, safeStats),
+            shortest: formatData(shortestRoute, shortestStats),
+            balanced: formatData(balancedRoute, balancedStats)
         });
 
     } catch (error) {
-        console.error("길찾기 실패:", error.response?.data || error.message);
-        res.status(500).json({ error: "길찾기 실패" });
+        console.error("경로 분석 실패:", error.message);
+        res.status(500).json({ error: "경로를 찾을 수 없습니다." });
     }
 });
 
