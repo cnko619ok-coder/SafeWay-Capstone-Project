@@ -18,11 +18,47 @@ export default function RouteResultScreen({ userUid }) {
     const [map, setMap] = useState(null);
     const [isSheetOpen, setIsSheetOpen] = useState(true);
 
-    // 🚨 2. 경로 변수 선언 (Hook 실행을 위해 최상단에 배치)
-    // pathPoints가 있으면(검색 직후) 그것을 안전 경로로 사용, 없으면 routeData에서 찾음
-    const safePath = pathPoints && pathPoints.length > 0 
-        ? pathPoints 
-        : (routeData?.safety?.path || [{ lat: 37.5668, lng: 126.9790 }, { lat: 37.5672, lng: 126.9794 }]);
+    // 🚨 2. 실제 경로 데이터 상태 (초기값 null)
+    const [realPath, setRealPath] = useState(null);
+
+    // 안전 경로 (기본 직선 경로 - 백업용)
+    const backupPath = pathPoints && pathPoints.length > 0 ? pathPoints : [
+        { lat: 37.5668, lng: 126.9790 }, { lat: 37.5672, lng: 126.9794 }
+    ];
+
+    // 🚨 3. 화면이 켜지면 '진짜 경로' 요청
+    useEffect(() => {
+        const fetchRealRoute = async () => {
+            if (!pathPoints || pathPoints.length < 2) return;
+            
+            try {
+                // 출발지와 도착지만 보냄 (중간 지점은 카카오가 알아서 계산)
+                const start = pathPoints[0];
+                const end = pathPoints[pathPoints.length - 1];
+
+                console.log("🚀 길찾기 API 요청 시작:", start, end);
+
+                const response = await axios.post(`${API_BASE_URL}/api/route/directions`, {
+                    start, end
+                });
+
+                if (response.data.path && response.data.path.length > 0) {
+                    console.log("✅ 진짜 경로 데이터 수신 완료!", response.data.path.length, "개 좌표");
+                    setRealPath(response.data.path); // 진짜 경로로 업데이트!
+                } else {
+                    console.warn("⚠️ 경로 데이터가 비어있음");
+                }
+            } catch (error) {
+                console.warn("리얼 경로 로드 실패 (가상 경로 사용):", error);
+            }
+        };
+        fetchRealRoute();
+    }, [pathPoints]); // pathPoints가 바뀔 때마다 실행
+
+    // 🚨 4. 지도에 그릴 최종 경로 결정
+    // realPath가 있으면 그걸 쓰고, 없으면(로딩 전/실패) backupPath 사용
+    const safePath = realPath || backupPath;
+    
 
     // 최단 경로 (비교용 가상 경로 - 약간 위로)
     const shortestPath = safePath.map(p => ({ lat: p.lat - 0.0004, lng: p.lng - 0.0004 }));
