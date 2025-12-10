@@ -19,26 +19,42 @@ export default function RouteResultScreen({ userUid }) {
     const [map, setMap] = useState(null);
     const [isSheetOpen, setIsSheetOpen] = useState(true);
 
-    // 2. 경로 변수 선언 (Hook 실행을 위해 최상단에 배치)
-    // 안전 경로 (실제 계산된 경로)
-    const safePath = pathPoints && pathPoints.length > 0 ? pathPoints : [
-        { lat: 37.5668, lng: 126.9790 }, { lat: 37.5672, lng: 126.9794 }
-    ];
-    // 최단 경로 (비교용 가상 경로 - 약간 위로)
-    const shortestPath = safePath.map(p => ({ lat: p.lat + 0.0004, lng: p.lng - 0.0004 }));
-    // 균형 경로 (비교용 가상 경로 - 약간 아래로)
-    const balancedPath = safePath.map(p => ({ lat: p.lat - 0.0004, lng: p.lng + 0.0004 }));
+    // 🚨 1. 가상 경로 생성 함수 (일직선 대신 꺾이는 선 만들기)
+    const generateMockRoute = (points, offsetLat = 0, offsetLng = 0) => {
+        if (!points || points.length < 2) return [];
+        const start = points[0];
+        const end = points[points.length - 1];
+        
+        // 시작과 끝 사이에 5개의 중간 지점 생성 (지그재그 효과)
+        const waypoints = [];
+        for (let i = 1; i <= 5; i++) {
+            const ratio = i / 6;
+            const lat = start.lat + (end.lat - start.lat) * ratio + (Math.random() - 0.5) * 0.002 + offsetLat;
+            const lng = start.lng + (end.lng - start.lng) * ratio + (Math.random() - 0.5) * 0.002 + offsetLng;
+            waypoints.push({ lat, lng });
+        }
+        return [start, ...waypoints, end];
+    };
 
-    // 3. 지도 자동 줌 (useEffect)
+    // 2. 경로 변수 선언
+    const rawPath = pathPoints && pathPoints.length > 0 ? pathPoints : [{ lat: 37.5668, lng: 126.9790 }, { lat: 37.5672, lng: 126.9794 }];
+    
+    // 3가지 경로 생성 (안전/최단/균형)
+    const safePath = generateMockRoute(rawPath);
+    const shortestPath = generateMockRoute(rawPath, 0.0003, -0.0003); // 약간 다르게
+    const balancedPath = generateMockRoute(rawPath, -0.0003, 0.0003); // 약간 다르게
+
+    // 🚨 3. 지도 자동 줌 및 여백 설정 (하단 가림 방지)
     useEffect(() => {
         if (map && safePath.length > 0) {
             const bounds = new window.kakao.maps.LatLngBounds();
             safePath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
             shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            // 패널이 열려있을 때 지도가 가려지는 것을 고려해 아래쪽 여백(padding)을 줌
-            map.setBounds(bounds, 80, 0, 0, 300); 
+            
+            // 🚨 Padding 설정: (상, 우, 하, 좌) -> 하단 300px 여백으로 중심을 위로 올림
+            map.setBounds(bounds, 50, 20, 300, 20); 
         }
-    }, [map, safePath, shortestPath]);
+    }, [map, safePath]);
 
     // 4. 데이터 없음 예외 처리 (Hook 선언 후)
     if (!routeData) {

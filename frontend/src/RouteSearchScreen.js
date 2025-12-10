@@ -89,7 +89,7 @@ export default function RouteSearchScreen() {
                 }
             },
             () => { alert("위치 파악 실패"); setLoading(false); },
-            { enableHighAccuracy: true }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     };
 
