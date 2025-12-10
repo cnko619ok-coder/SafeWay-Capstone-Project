@@ -265,7 +265,7 @@ app.post('/api/route/directions', async (req, res) => {
         const response = await axios.post(url, {
             origin: { x: start.lng, y: start.lat },
             destination: { x: end.lng, y: end.lat },
-            priority: "RECOMMEND", // 추천 경로
+            priority: "SHORTEST", // 최단 경로
             car_fuel: "GASOLINE",
             car_hipass: false,
             alternatives: false,
