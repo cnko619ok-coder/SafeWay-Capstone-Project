@@ -7,7 +7,6 @@ import { Shield, Clock, MapPin, Navigation, Camera, Lightbulb, ChevronLeft, Aler
 import { Map, MapMarker, Polyline } from 'react-kakao-maps-sdk';
 
 const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8'; 
-// 🚨 ngrok 주소 확인 (바뀌었다면 수정 필요)
 const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
 
 export default function RouteResultScreen({ userUid }) {
@@ -15,66 +14,64 @@ export default function RouteResultScreen({ userUid }) {
     const navigate = useNavigate();
     
     // 1. 데이터 가져오기
-    const { routeData, searchData } = location.state || {};
+    const { routeData, searchData, pathPoints } = location.state || {};
     const [map, setMap] = useState(null);
     const [isSheetOpen, setIsSheetOpen] = useState(true);
-    const [realPath, setRealPath] = useState([]); // 🚨 실제 경로 저장할 상태
 
+    // 🚨 2. 경로 변수 선언 (Hook 실행을 위해 최상단에 배치)
+    // pathPoints가 있으면(검색 직후) 그것을 안전 경로로 사용, 없으면 routeData에서 찾음
+    const safePath = pathPoints && pathPoints.length > 0 
+        ? pathPoints 
+        : (routeData?.safety?.path || [{ lat: 37.5668, lng: 126.9790 }, { lat: 37.5672, lng: 126.9794 }]);
 
-    // 1. 기본 경로 (직선) - 로딩 전이나 실패 시 사용
-    const basicPath = pathPoints && pathPoints.length > 0 ? pathPoints : [
-        { lat: 37.5668, lng: 126.9790 }, { lat: 37.5672, lng: 126.9794 }
-    ];
+    // 최단 경로 (비교용 가상 경로 - 약간 위로)
+    const shortestPath = safePath.map(p => ({ lat: p.lat - 0.0004, lng: p.lng - 0.0004 }));
+    // 균형 경로 (비교용 가상 경로 - 약간 아래로)
+    const balancedPath = safePath.map(p => ({ lat: p.lat - 0.0004, lng: p.lng + 0.0004 }));
 
-    // 🚨 2. 화면이 켜지면 '진짜 경로' 요청
+    // 3. 지도 자동 줌 (useEffect)
     useEffect(() => {
-        const fetchRealRoute = async () => {
-            if (!pathPoints || pathPoints.length < 2) return;
-            
-            try {
-                // 출발지와 도착지만 보냄 (중간 지점은 카카오가 알아서 계산)
-                const start = pathPoints[0];
-                const end = pathPoints[pathPoints.length - 1];
-
-                const response = await axios.post(`${API_BASE_URL}/api/route/directions`, {
-                    start, end
-                });
-
-                if (response.data.path && response.data.path.length > 0) {
-                    setRealPath(response.data.path); // 진짜 경로로 업데이트!
-                }
-            } catch (error) {
-                console.warn("리얼 경로 로드 실패 (가상 경로 사용):", error);
-            }
-        };
-        fetchRealRoute();
-    }, [pathPoints]);
-
-    const safePath = routeData.safety.path;
-    const shortestPath = routeData.shortest.path;
-    const balancedPath = routeData.balanced.path;
-
-    // 4. 지도 자동 줌
-    useEffect(() => {
-        if (map && displayPath.length > 0) {
+        if (map && safePath.length > 0) {
             const bounds = new window.kakao.maps.LatLngBounds();
-            displayPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+            safePath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+            shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+            // 패널이 열려있을 때 지도가 가려지는 것을 고려해 아래쪽 여백(padding)을 줌
             map.setBounds(bounds, 80, 0, 0, 300); 
         }
-    }, [map, displayPath]); // realPath가 로드되면 다시 실행됨
+    }, [map, safePath, shortestPath]);
 
-    if (!routeData) return <div className="p-10 text-center">데이터 없음 <Link to="/">홈으로</Link></div>;
+    // 4. 데이터 없음 예외 처리 (Hook 선언 후)
+    if (!routeData) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4">
+                <p className="text-gray-600 mb-4">데이터가 없습니다.</p>
+                <Link to="/" className="text-blue-500 font-bold underline">홈으로 돌아가기</Link>
+            </div>
+        );
+    }
 
     const { safety, shortest, balanced } = routeData;
 
-    // 안내 시작
+    // 안내 시작 함수
     const handleStartNavigation = async (type) => {
         const selectedRoute = routeData[type];
         const typeName = type === 'safety' ? '안전' : type === 'shortest' ? '최단' : '균형';
 
         if (window.confirm(`${typeName} 경로로 안내를 시작하시겠습니까?`)) {
-            // (기록 저장 로직 - 생략, 기존과 동일)
-            navigate('/navigation', { state: { path: displayPath, routeInfo: selectedRoute, searchData } });
+            if (userUid) {
+                try {
+                    await axios.post(`${API_BASE_URL}/api/history`, {
+                        uid: userUid, 
+                        start: searchData.start, 
+                        end: searchData.end,
+                        score: selectedRoute.score, 
+                        distance: selectedRoute.distance, 
+                        time: selectedRoute.time,
+                        date: new Date().toLocaleDateString()
+                    });
+                } catch (e) { console.error(e); }
+            }
+            navigate('/navigation', { state: { path: safePath, routeInfo: selectedRoute, searchData } });
         }
     };
 
@@ -86,14 +83,14 @@ export default function RouteResultScreen({ userUid }) {
     return (
         <div className="h-screen w-full relative overflow-hidden bg-gray-100 font-sans">
             
-            {/* 배경 지도 */}
+            {/* 1. 배경 지도 (전체 화면) */}
             <div className="absolute inset-0 z-0">
-                <Map center={displayPath[0]} style={{ width: "100%", height: "100%" }} level={3} appkey={KAKAO_APP_KEY} onCreate={setMap}>
-                    <MapMarker position={displayPath[0]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", size: {width: 40, height: 40}}}/>
-                    <MapMarker position={displayPath[displayPath.length-1]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", size: {width: 40, height: 40}}}/>
+                <Map center={safePath[0]} style={{ width: "100%", height: "100%" }} level={3} appkey={KAKAO_APP_KEY} onCreate={setMap}>
+                    <MapMarker position={safePath[0]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", size: {width: 40, height: 40}}}/>
+                    <MapMarker position={safePath[safePath.length-1]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", size: {width: 40, height: 40}}}/>
                     
-                    {/* 🚨 진짜 도로 경로 (초록색) */}
-                    <Polyline path={[displayPath]} strokeWeight={8} strokeColor={"#10b981"} strokeOpacity={1} />
+                    {/* 경로 선들 */}
+                    <Polyline path={[safePath]} strokeWeight={7} strokeColor={"#10b981"} strokeOpacity={0.9} />
                     <Polyline path={[shortestPath]} strokeWeight={5} strokeColor={"#f59e0b"} strokeOpacity={0.7} strokeStyle={"shortdash"} />
                     <Polyline path={[balancedPath]} strokeWeight={5} strokeColor={"#eab308"} strokeOpacity={0.7} strokeStyle={"shortdot"} />
                 </Map>
@@ -121,7 +118,6 @@ export default function RouteResultScreen({ userUid }) {
 
                 {/* 상세 내용 (스크롤 가능) */}
                 <div className="flex-1 overflow-y-auto p-6 bg-gray-50 font-sans">
-                    
                     
                     {/* 그래프 비교 */}
                     <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-6">
@@ -158,7 +154,7 @@ export default function RouteResultScreen({ userUid }) {
                             <div className="h-12 w-[1px] bg-white/30 rounded-full"></div>
                             <div className="text-center opacity-90">
                                 <span className="block text-4xl font-bold mb-1">{shortest.score}</span>
-                                <div className="text-sm font-medium opacity-80">최단 경로</div>
+                                <div className="text-sm font-medium opacity-80 text-blue-100">최단 경로</div>
                             </div>
                         </div>
                     </div>
