@@ -18,65 +18,27 @@ export default function RouteResultScreen({ userUid }) {
     const [map, setMap] = useState(null);
     const [isSheetOpen, setIsSheetOpen] = useState(true);
 
+    // 백엔드에서 받아온 진짜 경로(path)를 그대로 사용합니다.
+    const { safety, shortest, balanced } = routeData || {};
     // 🚨 2. 실제 경로 데이터 상태 (초기값 null)
     const [realPath, setRealPath] = useState(null);
 
-    // 안전 경로 (기본 직선 경로 - 백업용)
-    const backupPath = pathPoints && pathPoints.length > 0 ? pathPoints : [
-        { lat: 37.5668, lng: 126.9790 }, { lat: 37.5672, lng: 126.9794 }
-    ];
-
-    // 🚨 3. 화면이 켜지면 '진짜 경로' 요청
-    useEffect(() => {
-        const fetchRealRoute = async () => {
-            if (!pathPoints || pathPoints.length < 2) return;
-            
-            try {
-                // 출발지와 도착지만 보냄 (중간 지점은 카카오가 알아서 계산)
-                const start = pathPoints[0];
-                const end = pathPoints[pathPoints.length - 1];
-
-                console.log("🚀 길찾기 API 요청 시작:", start, end);
-
-                const response = await axios.post(`${API_BASE_URL}/api/route/directions`, {
-                    start, end
-                });
-
-                if (response.data.path && response.data.path.length > 0) {
-                    console.log("✅ 진짜 경로 데이터 수신 완료!", response.data.path.length, "개 좌표");
-                    setRealPath(response.data.path); // 진짜 경로로 업데이트!
-                } else {
-                    console.warn("⚠️ 경로 데이터가 비어있음");
-                }
-            } catch (error) {
-                console.warn("리얼 경로 로드 실패 (가상 경로 사용):", error);
-            }
-        };
-        fetchRealRoute();
-    }, [pathPoints]); // pathPoints가 바뀔 때마다 실행
-
-    // 🚨 4. 지도에 그릴 최종 경로 결정
-    // realPath가 있으면 그걸 쓰고, 없으면(로딩 전/실패) backupPath 사용
-    const safePath = realPath || backupPath;
-    
-
-    // 최단 경로 (비교용 가상 경로 - 약간 위로)
-    const shortestPath = safePath.map(p => ({ lat: p.lat - 0.0004, lng: p.lng - 0.0004 }));
-    // 균형 경로 (비교용 가상 경로 - 약간 아래로)
-    const balancedPath = safePath.map(p => ({ lat: p.lat - 0.0004, lng: p.lng + 0.0004 }));
-
-    // 3. 지도 자동 줌 (useEffect)
+    // 3. 지도 자동 줌 (3가지 경로가 다 보이도록 설정)
     useEffect(() => {
         if (map && safePath.length > 0) {
             const bounds = new window.kakao.maps.LatLngBounds();
+            
+            // 모든 경로의 좌표를 범위에 포함시킴
             safePath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+            if (shortestPath.length > 0) shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+            if (balancedPath.length > 0) balancedPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+            
             // 패널이 열려있을 때 지도가 가려지는 것을 고려해 아래쪽 여백(padding)을 줌
             map.setBounds(bounds, 80, 0, 0, 300); 
         }
-    }, [map, safePath, shortestPath]);
+    }, [map, safePath, shortestPath, balancedPath]);
 
-    // 4. 데이터 없음 예외 처리 (Hook 선언 후)
+    // 4. 데이터 없음 예외 처리
     if (!routeData) {
         return (
             <div className="min-h-screen flex items-center justify-center p-4">
@@ -86,12 +48,12 @@ export default function RouteResultScreen({ userUid }) {
         );
     }
 
-    const { safety, shortest, balanced } = routeData;
-
     // 안내 시작 함수
     const handleStartNavigation = async (type) => {
         const selectedRoute = routeData[type];
         const typeName = type === 'safety' ? '안전' : type === 'shortest' ? '최단' : '균형';
+        // 선택한 경로의 좌표 데이터
+        const selectedPath = type === 'safety' ? safePath : type === 'shortest' ? shortestPath : balancedPath;
 
         if (window.confirm(`${typeName} 경로로 안내를 시작하시겠습니까?`)) {
             if (userUid) {
@@ -107,7 +69,8 @@ export default function RouteResultScreen({ userUid }) {
                     });
                 } catch (e) { console.error(e); }
             }
-            navigate('/navigation', { state: { path: safePath, routeInfo: selectedRoute, searchData } });
+            // 🚨 선택한 '진짜 경로' 데이터를 주행 화면으로 넘겨줍니다.
+            navigate('/navigation', { state: { path: selectedPath, routeInfo: selectedRoute, searchData } });
         }
     };
 
@@ -121,15 +84,19 @@ export default function RouteResultScreen({ userUid }) {
             
             {/* 1. 배경 지도 (전체 화면) */}
             <div className="absolute inset-0 z-0">
-                <Map center={safePath[0]} style={{ width: "100%", height: "100%" }} level={3} appkey={KAKAO_APP_KEY} onCreate={setMap}>
-                    <MapMarker position={safePath[0]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", size: {width: 40, height: 40}}}/>
-                    <MapMarker position={safePath[safePath.length-1]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", size: {width: 40, height: 40}}}/>
+                <Map center={safePath[0]|| {lat: 37.5665, lng: 126.9780}} style={{ width: "100%", height: "100%" }} level={2} appkey={KAKAO_APP_KEY} onCreate={setMap}>
+                    <MapMarker position={safePath[0]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", size: {width: 40, height: 40}}}/>
+                    <MapMarker position={safePath[safePath.length-1]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", size: {width: 40, height: 40}}}/>
                     
-                    {/* 경로 선들 */}
-                    <Polyline path={[safePath]} strokeWeight={7} strokeColor={"#10b981"} strokeOpacity={0.9} />
+                    {/* 🟢 안전 경로 (초록색 실선 - 가장 위) */}
+                    <Polyline path={[safePath]} strokeWeight={8} strokeColor={"#10b981"} strokeOpacity={1} strokeStyle={"solid"} />
+                    
+                    {/* 🟠 최단 경로 (주황색 점선) */}
                     <Polyline path={[shortestPath]} strokeWeight={5} strokeColor={"#f59e0b"} strokeOpacity={0.7} strokeStyle={"shortdash"} />
+                    
+                    {/* 🟡 균형 경로 (노란색 점선) */}
                     <Polyline path={[balancedPath]} strokeWeight={5} strokeColor={"#eab308"} strokeOpacity={0.7} strokeStyle={"shortdot"} />
-                </Map>
+                    </Map>
             </div>
 
             {/* 뒤로가기 버튼 */}
