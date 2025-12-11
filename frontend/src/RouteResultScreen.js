@@ -9,6 +9,18 @@ import { Map, MapMarker, Polyline } from 'react-kakao-maps-sdk';
 const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8'; 
 const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
 
+// 1. 커스텀 마커 이미지 정의 (NavigationScreen과 동일)
+const MARKER_IMAGES = {
+    start: {
+        src: "https://t1.daumcdn.net/localimg/localimages/07/2018/pc/img/marker_spot.png", 
+        size: { width: 30, height: 40 }, options: { offset: { x: 15, y: 40 } }
+    },
+    end: {
+        src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png",
+        size: { width: 35, height: 40 }, options: { offset: { x: 17.5, y: 40 } }
+    }
+};
+
 export default function RouteResultScreen({ userUid }) {
     const location = useLocation();
     const navigate = useNavigate();
@@ -102,9 +114,13 @@ export default function RouteResultScreen({ userUid }) {
             {/* 1. 배경 지도 (전체 화면) */}
             <div className="absolute inset-0 z-0">
                 <Map center={safePath[0]|| {lat: 37.5665, lng: 126.9780}} style={{ width: "100%", height: "100%" }} level={2} appkey={KAKAO_APP_KEY} onCreate={setMap}>
-                    <MapMarker position={safePath[0]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", size: {width: 40, height: 40}}}/>
-                    <MapMarker position={safePath[safePath.length-1]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", size: {width: 40, height: 40}}}/>
-                    
+                    {/* 마커 (커스텀 이미지 적용) */}
+                    {safePath.length > 0 && (
+                        <>
+                            <MapMarker position={safePath[0]} image={MARKER_IMAGES.start} title="출발지" zIndex={2} />
+                            <MapMarker position={safePath[safePath.length-1]} image={MARKER_IMAGES.end} title="도착지" zIndex={2} />
+                        </>
+                    )}
                     {/* 🟢 안전 경로 (초록색 실선 - 가장 위) */}
                     <Polyline path={[safePath]} strokeWeight={8} strokeColor={"#10b981"} strokeOpacity={1} strokeStyle={"solid"} />
                     
@@ -114,6 +130,13 @@ export default function RouteResultScreen({ userUid }) {
                     {/* 🟡 균형 경로 (노란색 점선) */}
                     <Polyline path={[balancedPath]} strokeWeight={5} strokeColor={"#eab308"} strokeOpacity={0.7} strokeStyle={"shortdot"} />
                     </Map>
+            </div>
+
+            {/* 🚨 2. 경로 범례 (Legend) 추가 🚨 */}
+            <div className="absolute top-16 right-4 bg-white/90 backdrop-blur-sm p-3 rounded-xl shadow-md z-10 text-xs font-bold text-gray-600 space-y-2">
+                <div className="flex items-center"><div className="w-4 h-1.5 bg-[#10b981] mr-2 rounded-full"></div>안전 경로</div>
+                <div className="flex items-center"><div className="w-4 h-1.5 bg-[#f59e0b] mr-2 rounded-full border-b border-dashed border-[#f59e0b]"></div>최단 경로</div>
+                <div className="flex items-center"><div className="w-4 h-1.5 bg-[#eab308] mr-2 rounded-full border-b border-dotted border-[#eab308]"></div>균형 경로</div>
             </div>
 
             {/* 뒤로가기 버튼 */}
