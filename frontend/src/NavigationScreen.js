@@ -9,17 +9,17 @@ const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8';
 
 // 🎨 1. 마커 이미지 업그레이드 (고화질 3D 스타일)
 const MARKER_IMGS = {
-    // 출발지: 빨간색 입체 핀
+    // 빨간색 핀 (출발지)
     start: {
-        src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", 
-        size: { width: 50, height: 45 }, 
-        options: { offset: { x: 15, y: 43 } }
+        src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png", 
+        size: { width: 31, height: 35 }, 
+        options: { offset: { x: 15, y: 35 } } // 끝부분이 좌표에 딱 맞게 조정
     },
-    // 도착지: 파란색 입체 핀
+    // 파란색 핀 (도착지)
     end: {
         src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", 
-        size: { width: 50, height: 45 }, 
-        options: { offset: { x: 15, y: 43 } }
+        size: { width: 35, height: 40 }, // 도착지는 조금 더 크게 강조
+        options: { offset: { x: 17, y: 40 } }
     },
     // 내 위치는 이미지 대신 '파동치는 점' (CustomOverlay) 사용
 };
