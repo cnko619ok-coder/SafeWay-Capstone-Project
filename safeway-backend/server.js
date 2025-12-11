@@ -350,11 +350,11 @@ app.post('/api/route/analyze', async (req, res) => {
             // 안전: 추천 옵션 + 경유지 1 (약간 돌아감)
             getKakaoRoute(start, end, "RECOMMEND", safeWaypoint), 
             // 최단: 최단 거리 옵션 + 경유지 없음 (직진)
-            getKakaoRoute(start, end, "SHORTEST", []),            
+            getKakaoRoute(start, end, "DISTANCE", []),            
             // 균형: 추천 옵션 + 경유지 2 (다른 길)
-            getKakaoRoute(start, end, "RECOMMEND", balancedWaypoint) 
+            getKakaoRoute(start, end, "TIME", balancedWaypoint) 
         ]);
-        
+
         // 3. 응답 데이터 구성
         const formatData = (route, stats) => ({
             path: route.path,
@@ -373,7 +373,7 @@ app.post('/api/route/analyze', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("경로 분석 실패:", error.message);
+        console.error("경로 분석 실패:", error.response?.data || error.message);
         res.status(500).json({ error: "경로를 찾을 수 없습니다." });
     }
 });
