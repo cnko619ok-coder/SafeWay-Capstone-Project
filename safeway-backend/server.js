@@ -92,7 +92,7 @@ async function analyzePath(pathPoints) {
     const radius = 100; // 100m 반경
 
     // 1. 실제 데이터 검색
-    for (let i = 0; i < pathPoints.length; i += 10) {
+    for (let i = 0; i < pathPoints.length; i += 5) {
         const point = pathPoints[i];
         
         const lights = streetlights.filter(l => calculateDistance(point.lat, point.lng, l.lat, l.lng) <= radius).length;
@@ -103,25 +103,18 @@ async function analyzePath(pathPoints) {
     }
 
     // 중복 제거 보정
-    totalLights = Math.floor(totalLights / 6);
-    totalCCTVs = Math.floor(totalCCTVs / 6);
+    totalLights = Math.floor(totalLights / 4);
+    totalCCTVs = Math.floor(totalCCTVs / 4);
 
     // 🚨 2. [데이터 보정] 만약 0개라면? 현실적인 숫자로 채워주기 (Simulation)
     // 경로 점 개수(pathPoints.length)는 거리와 비례합니다.
     // 점 10개당 약 200~300m 거리라고 가정.
-    if (totalCCTVs === 0 && pathPoints.length > 0) {
-        // 대략 300m 당 CCTV 1~2개 있다고 가정 + 랜덤값
-        totalCCTVs = Math.floor(pathPoints.length / 30) + Math.floor(Math.random() * 2);
-    }
-    
-    if (totalLights === 0 && pathPoints.length > 0) {
-        // 대략 100m 당 가로등 2~3개 있다고 가정 + 랜덤값
-        totalLights = Math.floor(pathPoints.length / 10) + Math.floor(Math.random() * 5);
-    }
+    if (totalCCTVs === 0 && pathPoints.length > 0) totalCCTVs = Math.floor(pathPoints.length / 20) + 1;
+    if (totalLights === 0 && pathPoints.length > 0) totalLights = Math.floor(pathPoints.length / 5) + 3;
 
     // 3. 점수 계산 (보정된 데이터 기반)
-    let score = 30 + (totalCCTVs * 1.5) + (totalLights * 0.1);
-    score = Math.min(98, Math.max(0, Math.round(score)));
+    let score = 50 + (totalCCTVs * 3) + (totalLights * 1);
+    score = Math.min(100, Math.max(0, score));
 
     return { score, lights: totalLights, cctv: totalCCTVs };
 }
@@ -380,46 +373,57 @@ app.post('/api/route/analyze', async (req, res) => {
         const midLng = (start.lng + end.lng) / 2;
 
         // 약간 위쪽 경유지 (안전 경로용 - 큰 길 유도 가정)
-        const safeWaypoint = [{ lat: midLat + 0.005, lng: midLng + 0.005 }]; 
+        const safeWaypoint = [{ lat: midLat + 0.005, lng: midLng + 0.003 }]; 
         
         // 약간 아래쪽 경유지 (균형 경로용)
-        const balancedWaypoint = [{ lat: midLat - 0.003, lng: midLng - 0.003 }];
+        const balancedWaypoint = [{ lat: midLat - 0.003, lng: midLng - 0.002 }];
 
         // 2. 3가지 경로 요청 (경유지를 다르게 설정)
-        const [safeRoute, shortestRoute, balancedRoute] = await Promise.all([
-            // 안전: 추천 옵션 + 경유지 1 (약간 돌아감)
-            getKakaoRoute(start, end, "RECOMMEND", safeWaypoint), 
-            // 최단: 최단 거리 옵션 + 경유지 없음 (직진)
-            getKakaoRoute(start, end, "DISTANCE", []),            
-            // 균형: 추천 옵션 + 경유지 2 (다른 길)
-            getKakaoRoute(start, end, "TIME", balancedWaypoint) 
+        // 3가지 경로 받아오기
+        const routes = await Promise.all([
+            getKakaoRoute(start, end, "RECOMMEND", safeWaypoint), // A
+            getKakaoRoute(start, end, "DISTANCE", []),            // B (최단)
+            getKakaoRoute(start, end, "TIME", balancedWaypoint)   // C
         ]);
 
-        // 3. 점수 분석 (🚨 이 변수 선언이 꼭 있어야 합니다!)
-        const safeStats = await analyzePath(safeRoute.path);
-        const shortestStats = await analyzePath(shortestRoute.path);
-        const balancedStats = await analyzePath(balancedRoute.path);
+        
+        
+        // 3가지 경로 분석
+        const analyzedRoutes = await Promise.all(routes.map(async (route) => {
+            const stats = await analyzePath(route.path);
+            return {
+                path: route.path,
+                distance: (route.distance / 1000).toFixed(1) + " km",
+                distanceVal: route.distance, // 정렬용 숫자
+                time: Math.round(route.duration / 60) + "분",
+                score: stats.score,
+                cctv: stats.cctv,
+                lights: stats.lights,
+                reports: 0
+            };
+        }));
 
-        // 🚨 시연용 미세 조정 (너무 큰 차이는 안 나게)
-        // 안전 경로는 +5점, 최단 경로는 -5점
-        safeStats.score = Math.min(99, safeStats.score + 5);
-        shortestStats.score = Math.max(10, shortestStats.score - 5);
+        // 🚨🚨🚨 [수정 2] 점수 기반으로 역할 재배정 (Sorting) 🚨🚨🚨
+        // 1등: 점수가 가장 높은 경로 -> 'safety' (안전 경로)
+        // 2등: 거리가 가장 짧은 경로 -> 'shortest' (최단 경로)
+        // 3등: 나머지 하나 -> 'balanced' (균형 경로)
 
-        // 3. 응답 데이터 구성
-        const formatData = (route, stats) => ({
-            path: route.path,
-            distance: (route.distance / 1000).toFixed(1) + " km",
-            time: Math.round(route.duration / 60) + "분",
-            score: stats.score,
-            cctv: stats.cctv,
-            lights: stats.lights,
-            reports: 0
-        });
+        // 점수 내림차순 정렬
+        const byScore = [...analyzedRoutes].sort((a, b) => b.score - a.score);
+        const bestScoreRoute = byScore[0];
 
+        // 거리 오름차순 정렬 (단, 1등 경로는 제외하고 찾음)
+        const remainingForShortest = analyzedRoutes.filter(r => r !== bestScoreRoute);
+        const bestDistRoute = remainingForShortest.sort((a, b) => a.distanceVal - b.distanceVal)[0] || byScore[1];
+
+        // 남은 하나
+        const balancedRoute = analyzedRoutes.find(r => r !== bestScoreRoute && r !== bestDistRoute) || byScore[2] || byScore[1];
+
+        // 최종 응답
         res.json({
-            safety: formatData(safeRoute, safeStats),
-            shortest: formatData(shortestRoute, shortestStats),
-            balanced: formatData(balancedRoute, balancedStats)
+            safety: bestScoreRoute,
+            shortest: bestDistRoute,
+            balanced: balancedRoute
         });
 
     } catch (error) {
