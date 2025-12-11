@@ -19,35 +19,24 @@ export default function RouteResultScreen({ userUid }) {
     const [isSheetOpen, setIsSheetOpen] = useState(true);
 
     // 백엔드에서 받아온 진짜 경로(path)를 그대로 사용합니다.
-    const { safety, shortest, balanced } = routeData || {};
+    const { safety, shortest, balanced } = routeData;
     // 🚨 2. 실제 경로 데이터 상태 (초기값 null)
-    const [realPath, setRealPath] = useState(null);
+   // const [realPath, setRealPath] = useState(null);
 
-    // (백엔드가 이미 다른 경로를 줍니다)
-    const safePath = safety?.path || [];
-    const shortestPath = shortest?.path || [];
-    const balancedPath = balanced?.path || [];
+    // 1. 초기 경로 데이터 설정 (백엔드 데이터가 없을 때 대비)
+    const safePath = routeData?.safety?.path || [];
+    const shortestPath = routeData?.shortest?.path || [];
+    const balancedPath = routeData?.balanced?.path || [];
 
     // 🚨 3. 지도 자동 줌 및 위치 보정 (핵심 수정!)
     useEffect(() => {
         if (map && safePath.length > 0) {
             const bounds = new window.kakao.maps.LatLngBounds();
-            
-            // 모든 경로 좌표를 포함하도록 범위 설정
             safePath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            
-            // 1단계: 경로가 꽉 차게 지도 범위 재설정 (확대)
-            map.setBounds(bounds);
-
-            // 2단계: 하단 시트에 가려지지 않게 중심 이동 (위로 올리기)
-            // 약간의 지연시간을 두어 setBounds 애니메이션 후 실행
-            setTimeout(() => {
-                // (x: 0, y: 150) -> 지도를 150px 아래로 내림 = 콘텐츠가 150px 위로 올라감
-                map.panBy(0, 150); 
-            }, 100);
+            if (shortestPath.length > 0) shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+            map.setBounds(bounds, 80, 0, 0, 300); 
         }
-    }, [map, safePath]);
+    }, [map, safePath, shortestPath]);
 
     // 4. 데이터 없음 예외 처리
     if (!routeData) {
@@ -59,29 +48,46 @@ export default function RouteResultScreen({ userUid }) {
         );
     }
 
-    // 안내 시작 함수
+   // 🚨🚨🚨 [핵심 수정] 선택한 경로의 '진짜 좌표'를 넘겨주는 함수 🚨🚨🚨
     const handleStartNavigation = async (type) => {
-        const selectedRoute = routeData[type];
-        const typeName = type === 'safety' ? '안전' : type === 'shortest' ? '최단' : '균형';
-        // 선택한 경로의 좌표 데이터
-        const selectedPath = type === 'safety' ? safePath : type === 'shortest' ? shortestPath : balancedPath;
+        // 1. 선택한 타입에 맞는 데이터와 경로를 찾음
+        let selectedRoute, selectedPath, typeName;
 
-        if (window.confirm(`${typeName} 경로로 안내를 시작하시겠습니까?`)) {
+        if (type === 'safety') {
+            selectedRoute = safety;
+            selectedPath = safePath; // 🟢 안전 경로 좌표
+            typeName = '안전 경로';
+        } else if (type === 'shortest') {
+            selectedRoute = shortest;
+            selectedPath = shortestPath; // 🟠 최단 경로 좌표
+            typeName = '최단 경로';
+        } else {
+            selectedRoute = balanced;
+            selectedPath = balancedPath; // 🟡 균형 경로 좌표
+            typeName = '균형 경로';
+        }
+
+        if (window.confirm(`${typeName}로 안내를 시작하시겠습니까?`)) {
+            // DB에 기록 저장
             if (userUid) {
                 try {
                     await axios.post(`${API_BASE_URL}/api/history`, {
                         uid: userUid, 
-                        start: searchData.start, 
-                        end: searchData.end,
-                        score: selectedRoute.score, 
-                        distance: selectedRoute.distance, 
-                        time: selectedRoute.time,
+                        start: searchData.start, end: searchData.end,
+                        score: selectedRoute.score, distance: selectedRoute.distance, time: selectedRoute.time,
                         date: new Date().toLocaleDateString()
                     });
                 } catch (e) { console.error(e); }
             }
-            // 🚨 선택한 '진짜 경로' 데이터를 주행 화면으로 넘겨줍니다.
-            navigate('/navigation', { state: { path: selectedPath, routeInfo: selectedRoute, searchData } });
+            
+            // 🚨 다음 화면으로 '선택된 경로(selectedPath)'를 보냄
+            navigate('/navigation', { 
+                state: { 
+                    path: selectedPath, // 👈 이게 일직선이 아닌 진짜 경로입니다!
+                    routeInfo: selectedRoute, // 시간, 거리 정보
+                    searchData: searchData    // 출발지, 도착지 이름
+                } 
+            });
         }
     };
 

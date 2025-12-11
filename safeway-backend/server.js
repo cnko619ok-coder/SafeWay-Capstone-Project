@@ -91,7 +91,7 @@ async function analyzePath(pathPoints) {
     let totalCCTVs = 0;
     let sampleCount = 0;
 
-    const radius = 50; // 100m 반경
+    const radius = 100; // 100m 반경
 
     // 1. 실제 데이터 검색
     for (let i = 0; i < pathPoints.length; i += 8) {

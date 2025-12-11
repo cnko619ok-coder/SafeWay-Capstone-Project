@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Map, MapMarker, Polyline } from 'react-kakao-maps-sdk';
-import { Phone, Check, AlertTriangle, User } from 'lucide-react';
+import { Phone, Check, AlertTriangle, User, Eye } from 'lucide-react';
 import axios from 'axios';
 
 const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8';
@@ -11,50 +11,67 @@ const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8';
 export default function NavigationScreen() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { path, routeInfo, searchData } = location.state || {};
+    const { path, routeInfo } = location.state || {};
     
-    // 주행 시뮬레이션 상태
+    // 상태 관리
     const [currentPos, setCurrentPos] = useState(path ? path[0] : null);
-    const [progress, setProgress] = useState(0); // 0 ~ 100%
-    const [isSOSPressed, setIsSOSPressed] = useState(false); // SOS 버튼 누름 상태
+    const [progress, setProgress] = useState(0);
+    const [remainingTime, setRemainingTime] = useState(routeInfo?.time || "0분");
+    const [arrivalTime, setArrivalTime] = useState("");
+    const [isSOSPressed, setIsSOSPressed] = useState(false);
 
-    // 🚨 주행 시뮬레이션 (자동으로 마커가 이동함)
+    // 1. 초기 도착 예정 시간 계산
+    useEffect(() => {
+        if (!routeInfo?.time) return;
+        const now = new Date();
+        const minutes = parseInt(routeInfo.time.replace(/[^0-9]/g, '')) || 15; // "18분" -> 18
+        now.setMinutes(now.getMinutes() + minutes);
+        setArrivalTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }, [routeInfo]);
+
+    // 2. 주행 시뮬레이션 & 시간 업데이트 (핵심!)
     useEffect(() => {
         if (!path || path.length < 2) return;
+        
+        const totalSteps = 200; // 200단계로 나눠서 이동 (약 20초 소요)
+        let step = 0;
+
         const interval = setInterval(() => {
-            setProgress((prev) => {
-                if (prev >= 100) {
-                    clearInterval(interval);
-                    return 100;
-                }
-                return prev + 1; // 1%씩 이동
-            });
-        }, 500); // 속도 조절
+            step++;
+            const ratio = step / totalSteps; // 0.0 ~ 1.0
+
+            if (ratio >= 1) {
+                clearInterval(interval);
+                setProgress(100);
+                setRemainingTime("도착!");
+                return;
+            }
+
+            // A. 지도 위 마커 이동
+            const index = Math.floor((path.length - 1) * ratio);
+            setCurrentPos(path[index]);
+            setProgress(ratio * 100);
+
+            // B. 남은 시간 실시간 계산
+            const initialMin = parseInt(routeInfo.time.replace(/[^0-9]/g, '')) || 15;
+            const leftMin = Math.ceil(initialMin * (1 - ratio));
+            setRemainingTime(`${leftMin}분`);
+
+        }, 100); // 0.1초마다 업데이트 (부드럽게)
 
         return () => clearInterval(interval);
-    }, [path]);
-
-    // 진행률에 따라 현재 위치 계산 (선형 보간)
-    useEffect(() => {
-        if (path && path.length >= 2) {
-            const start = path[0];
-            const end = path[path.length - 1];
-            const lat = start.lat + (end.lat - start.lat) * (progress / 100);
-            const lng = start.lng + (end.lng - start.lng) * (progress / 100);
-            setCurrentPos({ lat, lng });
-        }
-    }, [progress, path]);
+    }, [path, routeInfo]);
 
     if (!path) return <div>경로 데이터 없음</div>;
 
-    // SOS 버튼 롱프레스 이벤트 핸들러
+    // SOS 버튼 로직
     let pressTimer;
     const startPress = () => {
         setIsSOSPressed(true);
         pressTimer = setTimeout(() => {
-            alert("🚨 SOS 긴급 알림이 전송되었습니다!");
-            // 실제 문자 전송 로직 (window.location.href = 'sms:...')
-        }, 2000); // 2초
+            alert("🚨 보호자에게 SOS 알림이 전송되었습니다!");
+            window.location.href = 'sms:01012345678?body=SOS!%20도와주세요!';
+        }, 2000);
     };
     const endPress = () => {
         setIsSOSPressed(false);
