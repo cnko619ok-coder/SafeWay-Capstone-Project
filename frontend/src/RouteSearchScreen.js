@@ -70,12 +70,16 @@ export default function RouteSearchScreen() {
     const handleDeleteFavorite = (id, e) => { e.stopPropagation(); if(window.confirm("삭제하시겠습니까?")) setFavorites(favorites.filter(fav => fav.id !== id)); };
     const handleDeleteRecent = (idx) => setRecentDestinations(prev => prev.filter((_, i) => i !== idx));
 
+    // 🚨 내 위치 상태 추가 (검색 중심점용)
+    const [myPos, setMyPos] = useState(null);
+
     const handleCurrentLocation = () => {
         if (!navigator.geolocation) return alert("위치 정보 불가");
         setLoading(true);
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 const { latitude, longitude } = pos.coords;
+                setMyPos({ lat: latitude, lng: longitude }); // 👈 내 위치 저장!
                 if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
                     const geocoder = new window.kakao.maps.services.Geocoder();
                     geocoder.coord2Address(longitude, latitude, (result, status) => {
@@ -105,29 +109,28 @@ export default function RouteSearchScreen() {
             // 1. 장소 검색 객체 생성
             const ps = new window.kakao.maps.services.Places();
 
+            // 검색 옵션: 내 위치가 있으면 그 주변 2km(2000m) 우선 검색
+            const options = myPos ? {
+                location: new window.kakao.maps.LatLng(myPos.lat, myPos.lng),
+                radius: 2000, 
+                sort: window.kakao.maps.services.SortBy.DISTANCE // 거리순 정렬
+            } : {};
+            
             // 2. 키워드로 검색 (예: "강남역", "스타벅스")
             ps.keywordSearch(keyword, (data, status) => {
                 if (status === window.kakao.maps.services.Status.OK) {
-                    // 검색 결과 중 첫 번째 장소의 좌표 사용
-                    resolve({
-                        lat: parseFloat(data[0].y),
-                        lng: parseFloat(data[0].x),
-                    });
+                    // 가장 가까운 첫 번째 결과 사용
+                    resolve({ lat: parseFloat(data[0].y), lng: parseFloat(data[0].x) });
+                    console.log(`📍 검색 결과: ${data[0].place_name} (${data[0].address_name})`);
                 } else {
-                    // 장소 검색 실패 시, 주소 검색으로 재시도 (혹시 모르니)
+                    // 장소 검색 실패 시 주소 검색 시도 (기존 로직 유지)
                     const geocoder = new window.kakao.maps.services.Geocoder();
-                    geocoder.addressSearch(keyword, (result, addrStatus) => {
-                        if (addrStatus === window.kakao.maps.services.Status.OK) {
-                             resolve({
-                                lat: parseFloat(result[0].y),
-                                lng: parseFloat(result[0].x),
-                            });
-                        } else {
-                             reject(new Error(`'${keyword}' 검색 실패 (결과 없음)`));
-                        }
+                    geocoder.addressSearch(keyword, (res, stat) => {
+                        if (stat === 'OK') resolve({ lat: parseFloat(res[0].y), lng: parseFloat(res[0].x) });
+                        else reject(new Error("검색 결과 없음"));
                     });
                 }
-            });
+            }, options); // 👈 옵션 추가됨
         });
     };
 
