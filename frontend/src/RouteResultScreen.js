@@ -28,20 +28,26 @@ export default function RouteResultScreen({ userUid }) {
     const shortestPath = shortest?.path || [];
     const balancedPath = balanced?.path || [];
 
-    // 3. 지도 자동 줌 (3가지 경로가 다 보이도록 설정)
+    // 🚨 3. 지도 자동 줌 및 위치 보정 (핵심 수정!)
     useEffect(() => {
         if (map && safePath.length > 0) {
             const bounds = new window.kakao.maps.LatLngBounds();
             
-            // 모든 경로의 좌표를 범위에 포함시킴
+            // 모든 경로 좌표를 포함하도록 범위 설정
             safePath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            if (shortestPath.length > 0) shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            if (balancedPath.length > 0) balancedPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+            shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
             
-            // 패널이 열려있을 때 지도가 가려지는 것을 고려해 아래쪽 여백(padding)을 줌
-            map.setBounds(bounds, 80, 0, 0, 300); 
+            // 1단계: 경로가 꽉 차게 지도 범위 재설정 (확대)
+            map.setBounds(bounds);
+
+            // 2단계: 하단 시트에 가려지지 않게 중심 이동 (위로 올리기)
+            // 약간의 지연시간을 두어 setBounds 애니메이션 후 실행
+            setTimeout(() => {
+                // (x: 0, y: 150) -> 지도를 150px 아래로 내림 = 콘텐츠가 150px 위로 올라감
+                map.panBy(0, 150); 
+            }, 100);
         }
-    }, [map, safePath, shortestPath, balancedPath]);
+    }, [map, safePath]);
 
     // 4. 데이터 없음 예외 처리
     if (!routeData) {
@@ -89,7 +95,7 @@ export default function RouteResultScreen({ userUid }) {
             
             {/* 1. 배경 지도 (전체 화면) */}
             <div className="absolute inset-0 z-0">
-                <Map center={safePath[0]|| {lat: 37.5665, lng: 126.9780}} style={{ width: "100%", height: "100%" }} level={5} appkey={KAKAO_APP_KEY} onCreate={setMap}>
+                <Map center={safePath[0]|| {lat: 37.5665, lng: 126.9780}} style={{ width: "100%", height: "100%" }} level={2} appkey={KAKAO_APP_KEY} onCreate={setMap}>
                     <MapMarker position={safePath[0]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", size: {width: 40, height: 40}}}/>
                     <MapMarker position={safePath[safePath.length-1]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", size: {width: 40, height: 40}}}/>
                     
