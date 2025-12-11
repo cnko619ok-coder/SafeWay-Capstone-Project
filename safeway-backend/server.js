@@ -76,7 +76,7 @@ async function getCCTVData() {
         const response = await axios.get(url, { timeout: 10000 }); // 10초 대기
         
         const data = response.data[CCTV_API_SERVICE]?.row || [];
-        // console.log(`📹 CCTV 데이터 ${data.length}개 로드됨`); // 디버깅용
+        console.log(`📹 CCTV 데이터 ${data.length}개 로드됨`); // 디버깅용
         return data;
     } catch (error) { 
         console.error("❌ CCTV API 호출 실패:", error.message);
@@ -97,8 +97,7 @@ async function analyzePath(pathPoints) {
     for (let i = 0; i < pathPoints.length; i += 5) {
         const point = pathPoints[i];
         const lights = streetlights.filter(l => calculateDistance(point.lat, point.lng, l.lat, l.lng) <= radius).length;
-        const cctvs = cctvData.filter(c => calculateDistance(point.lat, point.lng, parseFloat(c.WGSXPT), parseFloat(c.WGSYPT)) <= radius).length;
-        totalLights += lights;
+        const cctvs = cctvData.filter(c => calculateDistance(point.lat, point.lng, parseFloat(c.WGSYPT), parseFloat(c.WGSXPT)) <= radius).length;        totalLights += lights;
         totalCCTVs += cctvs;
     }
 
