@@ -3,11 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk';
-import { Phone, Check, AlertTriangle, Eye } from 'lucide-react';
+import { Phone, Check, AlertTriangle, Eye, Navigation } from 'lucide-react';
 
 const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8';
 
-// 1. 🎨 예쁜 마커 이미지 (카카오맵 3D 스타일)
+// 🎨 1. 마커 이미지 업그레이드 (고화질 3D 스타일)
 const MARKER_IMGS = {
     start: {
         src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", 
@@ -17,11 +17,7 @@ const MARKER_IMGS = {
         src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", 
         size: { width: 50, height: 45 }, options: { offset: { x: 15, y: 43 } }
     },
-    current: {
-        // 내 위치 (파동치는 효과를 위해 이미지 대신 CustomOverlay 사용하지만, 기본 아이콘도 설정)
-        src: "https://map.kakao.com/link/map/my_position", 
-        size: { width: 30, height: 30 }
-    }
+    // 내 위치는 이미지 대신 '파동치는 점' (CustomOverlay) 사용
 };
 
 export default function NavigationScreen() {
@@ -30,20 +26,20 @@ export default function NavigationScreen() {
     const { path, routeInfo } = location.state || {};
     
     const [map, setMap] = useState(null);
-    const [currentPos, setCurrentPos] = useState(path ? path[0] : null);
+    const [currentPos, setCurrentPos] = useState(path ? path[0] : null); // 내 위치
     
-    // 경로 상태 (지나온 길 / 남은 길)
+    // 경로 상태 분리 (지나온 길 / 남은 길)
     const [passedPath, setPassedPath] = useState([]);
     const [remainPath, setRemainPath] = useState(path || []);
     
-    // 시간 정보 상태
+    // 시간 정보
     const [remainingTimeStr, setRemainingTimeStr] = useState(routeInfo?.time || "계산중");
     const [arrivalTimeStr, setArrivalTimeStr] = useState("");
     
     const [isSOSPressed, setIsSOSPressed] = useState(false);
     const watchId = useRef(null);
 
-    // 거리 계산 유틸리티 (미터 단위)
+    // 거리 계산 함수 (내 위치와 경로 사이 거리 측정용)
     const getDistance = (lat1, lng1, lat2, lng2) => {
         const R = 6371e3;
         const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
@@ -52,15 +48,17 @@ export default function NavigationScreen() {
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
-    // 🚨 2. 실시간 위치 추적 및 경로/시간 업데이트 🚨
+    // 🚨 2. 실제 위치 추적 로직 (자동 이동 삭제됨!) 🚨
     useEffect(() => {
         if (!path || path.length < 2 || !navigator.geolocation) return;
 
-        // 초기 총 거리 및 시간 파싱
-        const totalDistance = routeInfo?.distance ? parseFloat(routeInfo.distance.replace(/[^0-9.]/g, '')) * 1000 : 1000; // m 단위
+        // 초기 시간 설정
         const totalMinutes = parseInt(routeInfo?.time?.replace(/[^0-9]/g, '')) || 15;
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + totalMinutes);
+        setArrivalTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
-        // 위치 추적 시작
+        // 위치 감시 시작
         watchId.current = navigator.geolocation.watchPosition(
             (position) => {
                 const newLat = position.coords.latitude;
@@ -75,58 +73,44 @@ export default function NavigationScreen() {
                 // 2-1. 경로 매칭: 현재 위치에서 가장 가까운 경로 점 찾기
                 let minIdx = 0;
                 let minDist = Infinity;
+                
+                // 성능을 위해 전체 경로 중 가까운 100개 점만 비교하거나 전체 비교
                 path.forEach((p, i) => {
                     const d = getDistance(newLat, newLng, p.lat, p.lng);
                     if (d < minDist) { minDist = d; minIdx = i; }
                 });
 
-                // 2-2. 경로 자르기 (지나온 길 / 남은 길)
-                // 지나온 길: 시작점 ~ 현재 위치까지
-                const passed = [...path.slice(0, minIdx + 1), newPos];
+                // 2-2. 경로 자르기 (지나온 길 vs 남은 길)
+                // 지나온 길: 시작점 ~ 현재 위치까지 (회색 처리용)
+                const passed = path.slice(0, minIdx + 1);
                 setPassedPath(passed);
 
-                // 남은 길: 현재 위치 ~ 도착점까지
+                // 남은 길: 현재 위치 ~ 도착점까지 (파란색 처리용)
+                // (경로가 끊기지 않게 현재 위치를 시작점으로 추가)
                 const remain = [newPos, ...path.slice(minIdx + 1)];
                 setRemainPath(remain);
 
-                // 2-3. 남은 시간 및 도착 예정 시간 실시간 계산
-                const remainingRatio = Math.max(0, (path.length - minIdx) / path.length); // 남은 비율
+                // 2-3. 시간 재계산 (남은 거리 비율에 따라)
+                const remainingRatio = Math.max(0, (path.length - minIdx) / path.length);
                 const leftMin = Math.ceil(totalMinutes * remainingRatio);
-                
-                // 남은 시간이 1분 미만이면 '곧 도착'
                 setRemainingTimeStr(leftMin > 0 ? `${leftMin}분` : "곧 도착");
-
-                // 도착 예정 시간 업데이트 (현재 시간 + 남은 시간)
-                const now = new Date();
-                now.setMinutes(now.getMinutes() + leftMin);
-                setArrivalTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
                 // 2-4. 도착 판정 (도착지 반경 30m 이내)
                 const endPos = path[path.length - 1];
                 if (getDistance(newLat, newLng, endPos.lat, endPos.lng) < 30) {
-                    alert("목적지에 도착했습니다! 안내를 종료합니다.");
+                    alert("목적지에 도착했습니다! 🎉");
                     navigator.geolocation.clearWatch(watchId.current);
                     navigate('/');
                 }
             },
             (err) => console.warn("GPS 수신 대기중...", err),
-            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
         );
 
         return () => {
             if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
         };
     }, [path, map, routeInfo, navigate]);
-
-    // 초기 도착 시간 설정 (GPS 잡히기 전)
-    useEffect(() => {
-        if (routeInfo?.time) {
-            const now = new Date();
-            const min = parseInt(routeInfo.time.replace(/[^0-9]/g, '')) || 0;
-            now.setMinutes(now.getMinutes() + min);
-            setArrivalTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-        }
-    }, [routeInfo]);
 
     if (!path) return <div className="flex justify-center items-center h-screen">경로 로딩중...</div>;
 
@@ -149,31 +133,36 @@ export default function NavigationScreen() {
             <div className="h-[60vh] w-full relative">
                 <Map center={currentPos || path[0]} style={{ width: "100%", height: "100%" }} level={2} appkey={KAKAO_APP_KEY} onCreate={setMap}>
                     
-                    {/* 출발지 마커 */}
-                    <MapMarker position={path[0]} image={MARKER_IMAGES.start} title="출발" />
+                    {/* 마커: 출발지 & 도착지 */}
+                    <MapMarker position={path[0]} image={MARKER_IMGS.start} title="출발" />
+                    <MapMarker position={path[path.length-1]} image={MARKER_IMGS.end} title="도착" />
                     
-                    {/* 도착지 마커 */}
-                    <MapMarker position={path[path.length-1]} image={MARKER_IMAGES.end} title="도착" />
-                    
-                    {/* 🚨 내 위치 마커 (파동치는 애니메이션 효과) */}
+                    {/* 🚨 내 위치 마커 (파동치는 파란 점) */}
                     {currentPos && (
                         <CustomOverlayMap position={currentPos} zIndex={99}>
                             <div className="relative flex items-center justify-center">
-                                <div className="w-5 h-5 bg-blue-500 rounded-full border-2 border-white shadow-lg z-20"></div>
-                                <div className="absolute w-12 h-12 bg-blue-500 rounded-full opacity-40 animate-ping z-10"></div>
+                                <div className="w-5 h-5 bg-blue-600 rounded-full border-2 border-white shadow-lg z-20"></div>
+                                <div className="absolute w-16 h-16 bg-blue-500 rounded-full opacity-30 animate-ping z-10"></div>
                             </div>
                         </CustomOverlayMap>
                     )}
 
-                    {/* 🚨 경로 그리기 */}
-                    {/* 지나온 길: 회색 */}
-                    <Polyline path={[passedPath]} strokeWeight={8} strokeColor={"#9ca3af"} strokeOpacity={0.5} strokeStyle={"solid"} />
-                    {/* 남은 길: 파란색 (화살표 패턴 추천하지만, 기본 실선 사용) */}
-                    <Polyline path={[remainPath]} strokeWeight={10} strokeColor={"#3b82f6"} strokeOpacity={1} strokeStyle={"solid"} />
+                    {/* 🚨 경로 그리기 (색상 구분) */}
+                    {/* 지나온 길: 옅은 회색 */}
+                    <Polyline path={[passedPath]} strokeWeight={8} strokeColor={"#cbd5e1"} strokeOpacity={0.6} strokeStyle={"solid"} />
+                    {/* 남은 길: 진한 파란색 */}
+                    <Polyline path={[remainPath]} strokeWeight={10} strokeColor={"#2563eb"} strokeOpacity={1} strokeStyle={"solid"} />
                 
                 </Map>
+
+                {/* 🚨 지도 범례 (Legend) */}
+                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur p-2.5 rounded-xl shadow-lg z-10 text-xs font-bold text-gray-600 space-y-1.5 border border-gray-100">
+                    <div className="flex items-center"><div className="w-8 h-1.5 bg-[#2563eb] rounded mr-2"></div>남은 경로</div>
+                    <div className="flex items-center"><div className="w-8 h-1.5 bg-[#cbd5e1] rounded mr-2"></div>지나온 길</div>
+                    <div className="flex items-center"><div className="w-2.5 h-2.5 bg-blue-600 rounded-full border border-white mr-2 ml-2.5"></div>내 위치</div>
+                </div>
                 
-                {/* 🚨 상단 정보창 (시간 정보) */}
+                {/* 상단 정보창 (시간 정보) */}
                 <div className="absolute bottom-6 left-6 right-6 bg-white/95 backdrop-blur-sm p-5 rounded-3xl shadow-xl z-10 flex justify-between items-center border border-gray-100">
                     <div>
                         <div className="text-xs text-gray-500 font-bold mb-1">남은 시간</div>
@@ -187,7 +176,7 @@ export default function NavigationScreen() {
             </div>
 
             {/* 2. 하단 컨트롤 영역 */}
-            <div className="flex-1 bg-gray-50 p-6 flex flex-col items-center rounded-t-[2.5rem] -mt-6 relative z-20 shadow-inner">
+            <div className="flex-1 bg-gray-50 p-6 flex flex-col items-center rounded-t-[2.5rem] -mt-6 relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
                 
                 {/* 보호자 모니터링 표시 */}
                 <div className="w-full bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6 flex items-center justify-between">
@@ -213,16 +202,20 @@ export default function NavigationScreen() {
                     <p className="text-xs text-gray-400 mt-4 font-medium">위급 시 2초간 꾹 눌러주세요</p>
                 </div>
 
-                {/* 종료 버튼 */}
+                {/* 하단 버튼 */}
                 <div className="w-full grid grid-cols-2 gap-3">
                     <a href="tel:112" className="flex items-center justify-center bg-white border border-gray-200 text-gray-600 py-3.5 rounded-xl font-bold shadow-sm hover:bg-gray-50">
                         <Phone className="w-4 h-4 mr-2" /> 112 신고
                     </a>
                     <button 
-                        onClick={() => { navigate('/'); }}
+                        onClick={() => { 
+                            navigator.geolocation.clearWatch(watchId.current);
+                            alert("안전하게 도착했습니다! 🎉"); 
+                            navigate('/'); 
+                        }}
                         className="flex items-center justify-center bg-green-500 text-white py-3.5 rounded-xl font-bold shadow-md hover:bg-green-600"
                     >
-                        <Check className="w-5 h-5 mr-2" /> 안내 종료
+                        <Check className="w-5 h-5 mr-2" /> 도착 완료
                     </button>
                 </div>
             </div>
