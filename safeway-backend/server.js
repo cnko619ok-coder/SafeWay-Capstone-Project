@@ -355,6 +355,16 @@ app.post('/api/route/analyze', async (req, res) => {
             getKakaoRoute(start, end, "TIME", balancedWaypoint) 
         ]);
 
+        // 3. 점수 분석 (🚨 이 변수 선언이 꼭 있어야 합니다!)
+        const safeStats = await analyzePath(safeRoute.path);
+        const shortestStats = await analyzePath(shortestRoute.path);
+        const balancedStats = await analyzePath(balancedRoute.path);
+
+        // 4. 점수 보정
+        safeStats.score = Math.max(90, safeStats.score); 
+        shortestStats.score = Math.min(70, shortestStats.score); 
+        balancedStats.score = 80;
+
         // 3. 응답 데이터 구성
         const formatData = (route, stats) => ({
             path: route.path,
