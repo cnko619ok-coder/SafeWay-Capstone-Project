@@ -47,17 +47,34 @@ app.use(express.json());
 
 // 가로등 데이터 캐싱 (일일 할당량 절약)
 let cachedStreetlights = []; 
-async function loadStreetlightsData() {
-    if (cachedStreetlights.length > 0) return;
+let cachedCCTVs = []; // 🚨 CCTV 저장소 추가
+
+async function loadInitialData() {
+    // 1. 가로등 로드
     try {
         console.log("📡 가로등 데이터 로딩 중...");
         const snapshot = await db.collection('streetlights').get();
-        if (snapshot.empty) return;
-        cachedStreetlights = snapshot.docs.map(doc => doc.data());
-        console.log(`✅ 가로등 데이터 ${cachedStreetlights.length}개 로드 완료!`);
+        if (!snapshot.empty) {
+            cachedStreetlights = snapshot.docs.map(doc => doc.data());
+            console.log(`✅ 가로등 데이터 ${cachedStreetlights.length}개 로드 완료!`);
+        }
     } catch (error) { console.error("가로등 로드 실패:", error.message); }
+
+    // 2. 🚨 CCTV 데이터 대량 로드 (API 호출)
+    try {
+        console.log("📡 CCTV 데이터 로딩 중...");
+        // 1번부터 3000번까지 요청 (더 많이 필요하면 숫자 변경)
+        const url = `${SEOUL_CCTV_BASE_URL}${SEOUL_CCTV_KEY}/json/${CCTV_API_SERVICE}/1/3000/`; 
+        const response = await axios.get(url, { timeout: 10000 });
+        const data = response.data[CCTV_API_SERVICE]?.row || [];
+        
+        // 좌표가 있는 데이터만 필터링해서 저장
+        cachedCCTVs = data.filter(c => c.WGSXPT && c.WGSYPT);
+        console.log(`✅ CCTV 데이터 ${cachedCCTVs.length}개 로드 완료!`);
+    } catch (error) { console.error("CCTV 로드 실패:", error.message); }
 }
-loadStreetlightsData();
+// 서버 시작 시 실행
+loadInitialData();
 
 // 거리 계산 함수 (Haversine Formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {
