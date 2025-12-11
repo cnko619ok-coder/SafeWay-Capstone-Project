@@ -23,6 +23,11 @@ export default function RouteResultScreen({ userUid }) {
     // 🚨 2. 실제 경로 데이터 상태 (초기값 null)
     const [realPath, setRealPath] = useState(null);
 
+    // (백엔드가 이미 다른 경로를 줍니다)
+    const safePath = safety?.path || [];
+    const shortestPath = shortest?.path || [];
+    const balancedPath = balanced?.path || [];
+    
     // 3. 지도 자동 줌 (3가지 경로가 다 보이도록 설정)
     useEffect(() => {
         if (map && safePath.length > 0) {

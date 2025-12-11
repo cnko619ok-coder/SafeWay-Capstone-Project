@@ -100,14 +100,19 @@ async function analyzePath(pathPoints) {
 }
 
 // 🚨 [누락되었던 함수 추가] 카카오 길찾기 요청 함수
-async function getKakaoRoute(start, end, priority) {
+async function getKakaoRoute(start, end, priority, waypoints = []) {
     const url = "https://apis-navi.kakaomobility.com/v1/waypoints/directions";
-    const response = await axios.post(url, {
+    const requestBody = {
         origin: { x: start.lng, y: start.lat },
         destination: { x: end.lng, y: end.lat },
         priority: priority, 
         car_fuel: "GASOLINE", car_hipass: false, alternatives: false, road_details: false
-    }, {
+    };
+    // 경유지가 있으면 추가
+    if (waypoints.length > 0) {
+        requestBody.waypoints = waypoints.map(wp => ({ x: wp.lng, y: wp.lat }));
+    }
+    const response = await axios.post(url, requestBody, {
         headers: { "Content-Type": "application/json", "Authorization": `KakaoAK ${KAKAO_REST_API_KEY}` }
     });
 
@@ -328,20 +333,28 @@ app.post('/api/route/analyze', async (req, res) => {
     if (!start || !end) return res.status(400).json({ error: '좌표 누락' });
 
     try {
-        console.log(`🚀 경로 분석 시작: (${start.lat},${start.lng}) -> (${end.lat},${end.lng})`);
+        console.log(`🚀 경로 다양화 분석 시작`);
 
-        // 1. 3가지 경로 병렬 요청 (추천, 최단, 시간우선)
+        // 1. 중간 지점 계산 (경로를 비틀기 위해)
+        const midLat = (start.lat + end.lat) / 2;
+        const midLng = (start.lng + end.lng) / 2;
+
+        // 약간 위쪽 경유지 (안전 경로용 - 큰 길 유도 가정)
+        const safeWaypoint = [{ lat: midLat + 0.002, lng: midLng + 0.002 }]; 
+        
+        // 약간 아래쪽 경유지 (균형 경로용)
+        const balancedWaypoint = [{ lat: midLat - 0.001, lng: midLng - 0.001 }];
+
+        // 2. 3가지 경로 요청 (경유지를 다르게 설정)
         const [safeRoute, shortestRoute, balancedRoute] = await Promise.all([
-            getKakaoRoute(start, end, "RECOMMEND"), // 안전(추천)
-            getKakaoRoute(start, end, "DISTANCE"),  // 최단(거리)
-            getKakaoRoute(start, end, "TIME")       // 균형(시간)
+            // 안전: 추천 옵션 + 경유지 1 (약간 돌아감)
+            getKakaoRoute(start, end, "RECOMMEND", safeWaypoint), 
+            // 최단: 최단 거리 옵션 + 경유지 없음 (직진)
+            getKakaoRoute(start, end, "SHORTEST", []),            
+            // 균형: 추천 옵션 + 경유지 2 (다른 길)
+            getKakaoRoute(start, end, "RECOMMEND", balancedWaypoint) 
         ]);
-
-        // 2. 각 경로별 안전 점수 분석
-        const safeStats = await analyzePath(safeRoute.path);
-        const shortestStats = await analyzePath(shortestRoute.path);
-        const balancedStats = await analyzePath(balancedRoute.path);
-
+        
         // 3. 응답 데이터 구성
         const formatData = (route, stats) => ({
             path: route.path,
