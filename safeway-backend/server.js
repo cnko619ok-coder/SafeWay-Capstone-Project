@@ -28,6 +28,8 @@ const SEOUL_CCTV_KEY = process.env.SEOUL_CCTV_KEY;
 const CCTV_API_SERVICE = 'safeOpenCCTV'; 
 const SEOUL_CCTV_BASE_URL = 'http://openapi.seoul.go.kr:8088/';
 
+FIREBASE_WEB_API_KEY="AIzaSyCwSfI5yNqeosNX3Ve9W9AhpNc5Q6_AQPU"
+
 // 🚨 [필수] 카카오 REST API 키
 const KAKAO_REST_API_KEY = "8b061f49c292c06e12c6e11814895014"; 
 
@@ -69,10 +71,17 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 // CCTV 데이터 가져오기
 async function getCCTVData() {
     try {
-        const url = `${SEOUL_CCTV_BASE_URL}${SEOUL_CCTV_KEY}/json/${CCTV_API_SERVICE}/1/100/`; 
-        const response = await axios.get(url, { timeout: 3000 });
-        return response.data[CCTV_API_SERVICE]?.row || [];
-    } catch (error) { return []; }
+        // 서울시 전체 CCTV 데이터 요청 (1~1000개)
+        const url = `${SEOUL_CCTV_BASE_URL}${SEOUL_CCTV_KEY}/json/${CCTV_API_SERVICE}/1/1000/`; 
+        const response = await axios.get(url, { timeout: 10000 }); // 10초 대기
+        
+        const data = response.data[CCTV_API_SERVICE]?.row || [];
+        // console.log(`📹 CCTV 데이터 ${data.length}개 로드됨`); // 디버깅용
+        return data;
+    } catch (error) { 
+        console.error("❌ CCTV API 호출 실패:", error.message);
+        return []; 
+    }
 }
 
 // [핵심] 경로 분석 함수 (안전 점수 계산)
@@ -82,18 +91,22 @@ async function analyzePath(pathPoints) {
     
     let totalLights = 0;
     let totalCCTVs = 0;
-    const radius = 50; 
+    const radius = 100; //감지 반경 100m
 
     // 성능 최적화: 10개 단위 샘플링
-    for (let i = 0; i < pathPoints.length; i += 10) {
+    for (let i = 0; i < pathPoints.length; i += 5) {
         const point = pathPoints[i];
         const lights = streetlights.filter(l => calculateDistance(point.lat, point.lng, l.lat, l.lng) <= radius).length;
-        const cctvs = cctvData.filter(c => calculateDistance(point.lat, point.lng, c.WGSXPT, c.WGSYPT) <= radius).length;
+        const cctvs = cctvData.filter(c => calculateDistance(point.lat, point.lng, parseFloat(c.WGSXPT), parseFloat(c.WGSYPT)) <= radius).length;
         totalLights += lights;
         totalCCTVs += cctvs;
     }
 
-    let score = 60 + (totalCCTVs * 5) + (totalLights * 1);
+    // 중복 카운트 방지를 위해 나누기 (샘플링 보정)
+    totalLights = Math.floor(totalLights / 3); 
+    totalCCTVs = Math.floor(totalCCTVs / 3);
+
+    let score = 60 + (totalCCTVs * 10) + (totalLights * 2);
     score = Math.min(100, Math.max(0, score));
 
     return { score, lights: totalLights, cctv: totalCCTVs };
@@ -156,11 +169,24 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
+
+    if (!email || !password) return res.status(400).json({ error: '정보 누락' });
+
     try {
-        const user = await auth.getUserByEmail(email);
-        const token = await auth.createCustomToken(user.uid); 
-        res.status(200).json({ message: '로그인 성공', uid: user.uid, token });
-    } catch (error) { res.status(401).json({ error: error.message }); }
+        // 🚨 Firebase REST API로 비밀번호 진짜 검사
+        const loginUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_WEB_API_KEY}`;
+        const response = await axios.post(loginUrl, { email, password, returnSecureToken: true });
+
+        res.status(200).json({ 
+            message: '로그인 성공', 
+            uid: response.data.localId, 
+            token: response.data.idToken 
+        });
+
+    } catch (error) {
+        console.error('로그인 실패:', error.response?.data?.error?.message || error.message);
+        res.status(401).json({ error: '비밀번호가 일치하지 않습니다.' });
+    }
 });
 
 // =======================================================
@@ -360,10 +386,6 @@ app.post('/api/route/analyze', async (req, res) => {
         const shortestStats = await analyzePath(shortestRoute.path);
         const balancedStats = await analyzePath(balancedRoute.path);
 
-        // 4. 점수 보정
-        safeStats.score = Math.max(90, safeStats.score); 
-        shortestStats.score = Math.min(70, shortestStats.score); 
-        balancedStats.score = 80;
 
         // 3. 응답 데이터 구성
         const formatData = (route, stats) => ({
