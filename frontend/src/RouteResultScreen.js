@@ -104,8 +104,8 @@ export default function RouteResultScreen({ userUid }) {
             {/* 1. 배경 지도 (전체 화면) */}
             <div className="absolute inset-0 z-0">
                 <Map center={safePath[0]|| {lat: 37.5665, lng: 126.9780}} style={{ width: "100%", height: "100%" }} level={2} appkey={KAKAO_APP_KEY} onCreate={setMap}>
-                    <MapMarker position={safePath[0]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", size: {width: 40, height: 45}}}/>
-                    <MapMarker position={safePath[safePath.length-1]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", size: {width: 40, height: 45}}}/>
+                   <MapMarker position={safePath[0]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", size: {width: 40, height: 45}}}/>
+                   <MapMarker position={safePath[safePath.length-1]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", size: {width: 40, height: 45}}}/>
                     
                     {/* 🟢 안전 경로 (초록색 실선 - 가장 위) */}
                     <Polyline path={[safePath]} strokeWeight={8} strokeColor={"#10b981"} strokeOpacity={1} strokeStyle={"solid"} />

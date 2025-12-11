@@ -179,6 +179,7 @@ const requireAuth = (req, res, next) => {
 // =======================================================
 //           A. 인증 API
 // =======================================================
+// 1. 일반 회원가입
 app.post('/api/auth/register', async (req, res) => {
     const { email, password, name } = req.body;
     try {
@@ -190,6 +191,7 @@ app.post('/api/auth/register', async (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+// 2. 일반 로그인
 app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -209,6 +211,31 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (error) {
         console.error('로그인 실패:', error.response?.data?.error?.message || error.message);
         res.status(401).json({ error: '비밀번호가 일치하지 않습니다.' });
+    }
+});
+
+// 🚨🚨🚨 3. [신규] 소셜 로그인 사용자 DB 저장 API 🚨🚨🚨
+// 구글 로그인 성공 후, 이 API를 호출해서 Firestore에 정보를 저장합니다.
+app.post('/api/auth/social', async (req, res) => {
+    const { uid, email, name } = req.body;
+    try {
+        // 이미 DB에 있는지 확인
+        const userDoc = await db.collection('users').doc(uid).get();
+        if (!userDoc.exists) {
+            // 없으면 새로 저장 (비밀번호 없음)
+            await db.collection('users').doc(uid).set({
+                name: name || 'Google User',
+                email: email,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            console.log(`✅ 소셜 유저 저장 완료: ${name}`);
+        } else {
+            console.log(`ℹ️ 이미 존재하는 소셜 유저: ${name}`);
+        }
+        res.status(200).json({ message: '소셜 로그인 동기화 완료' });
+    } catch (error) {
+        console.error("소셜 로그인 저장 실패:", error);
+        res.status(500).json({ error: error.message });
     }
 });
 
