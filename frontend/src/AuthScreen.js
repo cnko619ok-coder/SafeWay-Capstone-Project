@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import axios from 'axios'; 
 // 🚨 Firebase 관련 모듈 불러오기
-import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { auth } from './firebase';
 import { Shield, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 
@@ -78,7 +79,6 @@ export function AuthScreen({ onLoginSuccess }) {
 
   // 🚨🚨🚨 [신규] 구글 로그인 함수 추가 🚨🚨🚨
   const handleGoogleLogin = async () => {
-    const auth = getAuth();
     const provider = new GoogleAuthProvider();
 
     try {
