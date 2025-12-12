@@ -458,58 +458,50 @@ app.put('/api/users/:uid', requireAuth, async (req, res) => {
 // =======================================================
 //           F. 귀가 기록 & 즐겨찾기 API
 // =======================================================
-// ========================================================
-// 🚨 [수정] 즐겨찾기 API (사용자별 서브컬렉션 사용)
-// ========================================================
-// 1. 추가
-app.post('/api/favorites', requireAuth, async (req, res) => { 
-    try { 
-        // global collection이 아니라 users -> uid -> favorites 안에 저장
-        await db.collection('users').doc(req.uid).collection('favorites').add({ 
-            ...req.body, 
-            createdAt: admin.firestore.FieldValue.serverTimestamp() 
-        }); 
-        res.status(201).json({ message: '성공' }); 
-    } catch (e) { res.status(500).json({ error: e.message }); } 
+app.post('/api/favorites', requireAuth, async (req, res) => {
+    try {
+        // users 컬렉션 -> 내 UID 문서 -> favorites 서브컬렉션에 저장
+        await db.collection('users').doc(req.uid).collection('favorites').add({
+            ...req.body,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        res.status(201).json({ message: '성공' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. 조회
-app.get('/api/favorites/:uid', async (req, res) => { 
-    try { 
-        const snap = await db.collection('users').doc(req.params.uid).collection('favorites').orderBy('createdAt', 'desc').get(); 
-        res.json(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); 
-    } catch (e) { res.status(500).json({ error: e.message }); } 
+app.get('/api/favorites/:uid', async (req, res) => {
+    try {
+        // 내 UID 폴더 안의 데이터만 가져옴
+        const snap = await db.collection('users').doc(req.params.uid).collection('favorites').orderBy('createdAt', 'desc').get();
+        res.json(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 3. 삭제
-app.post('/api/favorites/delete', requireAuth, async (req, res) => { 
-    try { 
-        await db.collection('users').doc(req.body.uid).collection('favorites').doc(req.body.favoriteId).delete(); 
-        res.json({ message: '성공' }); 
-    } catch (e) { res.status(500).json({ error: e.message }); } 
+app.post('/api/favorites/delete', requireAuth, async (req, res) => {
+    try {
+        await db.collection('users').doc(req.body.uid).collection('favorites').doc(req.body.favoriteId).delete();
+        res.json({ message: '성공' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 
 // ========================================================
-// 🚨 [수정] 최근 목적지(History) API (사용자별 서브컬렉션 사용)
+// 🚨 [수정] 최근 목적지 API (사용자별 격리 저장)
 // ========================================================
-// 1. 추가
-app.post('/api/history', requireAuth, async (req, res) => { 
-    try { 
-        await db.collection('users').doc(req.body.uid).collection('history').add({ 
-            ...req.body, 
-            createdAt: admin.firestore.FieldValue.serverTimestamp() 
-        }); 
-        res.status(201).json({ message: '성공' }); 
-    } catch (e) { res.status(500).json({ error: e.message }); } 
+app.post('/api/history', requireAuth, async (req, res) => {
+    try {
+        await db.collection('users').doc(req.body.uid).collection('history').add({
+            ...req.body,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        res.status(201).json({ message: '성공' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. 조회
-app.get('/api/history/:uid', async (req, res) => { 
-    try { 
-        const snap = await db.collection('users').doc(req.params.uid).collection('history').orderBy('createdAt', 'desc').limit(10).get(); 
-        res.json(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); 
-    } catch (e) { res.status(500).json({ error: e.message }); } 
+app.get('/api/history/:uid', async (req, res) => {
+    try {
+        const snap = await db.collection('users').doc(req.params.uid).collection('history').orderBy('createdAt', 'desc').limit(10).get();
+        res.json(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // =======================================================

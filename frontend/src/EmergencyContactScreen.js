@@ -160,48 +160,20 @@ export default function EmergencyContactScreen({ userUid }) {
                 )}
             </main>
 
-            {/* 추가 모달 */}
+            {/* 🚨🚨🚨 [수정됨] 모달 위치 및 스타일 개선 🚨🚨🚨 */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-slide-up relative">{/* 닫기 버튼 추가 (편의성) */}
-                        <button onClick={() => setShowAddModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                            <X className="w-6 h-6" />
-                        </button>
-
-                        <h2 className="text-xl font-bold mb-4 text-gray-800">새 연락처 추가</h2>
-                        <div className="space-y-3">
-                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 focus-within:border-blue-500 focus-within:bg-white transition-colors">
-                                <label className="block text-xs text-gray-400 font-bold mb-1">이름</label>
-                                <input 
-                                    className="w-full bg-transparent outline-none text-gray-800 font-medium" 
-                                    placeholder="예: 홍길동"
-                                    value={newContact.name}
-                                    onChange={e => setNewContact({...newContact, name: e.target.value})}
-                                />
-                            </div>
-                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 focus-within:border-blue-500 focus-within:bg-white transition-colors">
-                                <label className="block text-xs text-gray-400 font-bold mb-1">전화번호</label>
-                                <input 
-                                    className="w-full bg-transparent outline-none text-gray-800 font-medium" 
-                                    placeholder="010-0000-0000"
-                                    value={newContact.phone}
-                                    onChange={e => setNewContact({...newContact, phone: e.target.value})}
-                                />
-                            </div>
-                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 focus-within:border-blue-500 focus-within:bg-white transition-colors">
-                                <label className="block text-xs text-gray-400 font-bold mb-1">관계 (선택)</label>
-                                <input 
-                                    className="w-full bg-transparent outline-none text-gray-800 font-medium" 
-                                    placeholder="예: 가족, 친구"
-                                    value={newContact.relation}
-                                    onChange={e => setNewContact({...newContact, relation: e.target.value})}
-                                />
-                            </div>
+                <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-scale-up relative">
+                        {/* 닫기 버튼 */}
+                        <button onClick={() => setShowAddModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-2"><X className="w-6 h-6" /></button>
+                        
+                        <h2 className="text-xl font-bold mb-5 text-gray-800">새 연락처 추가</h2>
+                        <div className="space-y-4">
+                            <div><label className="block text-xs text-gray-500 font-bold mb-1 ml-1">이름</label><input className="w-full bg-gray-50 p-3 rounded-xl border border-gray-200 outline-none focus:border-blue-500 transition-colors" placeholder="예: 홍길동" value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} /></div>
+                            <div><label className="block text-xs text-gray-500 font-bold mb-1 ml-1">전화번호</label><input className="w-full bg-gray-50 p-3 rounded-xl border border-gray-200 outline-none focus:border-blue-500 transition-colors" placeholder="010-0000-0000" value={newContact.phone} onChange={e => setNewContact({...newContact, phone: e.target.value})} /></div>
+                            <div><label className="block text-xs text-gray-500 font-bold mb-1 ml-1">관계 (선택)</label><input className="w-full bg-gray-50 p-3 rounded-xl border border-gray-200 outline-none focus:border-blue-500 transition-colors" placeholder="예: 가족" value={newContact.relation} onChange={e => setNewContact({...newContact, relation: e.target.value})} /></div>
                         </div>
-                        <div className="flex gap-3 mt-6">
-                             <button onClick={() => setShowAddModal(false)} className="flex-1 py-3.5 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition">취소</button>
-                             <button onClick={handleAdd} className="flex-1 py-3.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">저장하기</button>
-                        </div>
+                        <button onClick={handleAdd} className="w-full mt-6 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition active:scale-95">저장하기</button>
                     </div>
                 </div>
             )}
