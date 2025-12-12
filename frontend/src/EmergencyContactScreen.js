@@ -1,135 +1,206 @@
 // frontend/src/EmergencyContactScreen.js
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ChevronLeft, Trash2, Plus, Users, AlertTriangle, X } from 'lucide-react';
-import { Link } from 'react-router-dom'; 
+import { ArrowLeft, Plus, Trash2, Phone, User, Calendar, ArrowDownAZ } from 'lucide-react';
+import { toast } from 'sonner';
 
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
-
-const ContactItem = ({ contact, onDelete }) => (
-  <div className="flex items-center justify-between p-4 bg-white border-b hover:bg-gray-50 transition-colors">
-    <div className="flex items-center">
-      <div className="bg-blue-100 text-blue-600 rounded-full w-10 h-10 flex items-center justify-center font-bold mr-3">
-        {contact.name[0]}
-      </div>
-      <div>
-        <div className="font-semibold text-gray-800">{contact.name}</div>
-        <div className="text-sm text-gray-500">{contact.number} ({contact.relation || '지인'})</div> 
-      </div>
-    </div>
-    <button onClick={() => onDelete(contact.id)} className="text-red-500 hover:text-red-700 p-2 rounded-full transition" title="삭제">
-      <Trash2 className="w-5 h-5" />
-    </button>
-  </div>
-);
-
-const AddContactModal = ({ isOpen, onClose, onSuccess, userUid }) => {
-  const [formData, setFormData] = useState({ name: '', number: '', relation: '가족' });
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddSubmit = async (e) => {
-    e.preventDefault();
-    if (!userUid) return alert('❌ 사용자 인증 정보가 없습니다.');
-
-    try {
-      // ⚡️ 수정된 부분: { uid: userUid, ...formData }
-      // 백엔드로 보낼 때 내 UID를 같이 보내야 401 에러가 안 납니다.
-      await axios.post(`${API_BASE_URL}/api/contacts`, { 
-        uid: userUid, // 👈 여기가 핵심입니다!
-        ...formData 
-      });
-      
-      alert('✅ 연락처가 성공적으로 추가되었습니다.');
-      onSuccess();
-      onClose();
-    } catch (err) {
-      // 에러 처리 코드...
-      const statusCode = err.response ? err.response.status : '네트워크';
-      alert(`❌ 연락처 추가 실패 (${statusCode} 에러)`);
-    }
-  };
-
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
-        <h2 className="text-xl font-bold mb-4">새 연락처 추가</h2>
-        <form onSubmit={handleAddSubmit} className="space-y-4">
-          <input type="text" name="name" placeholder="이름" required className="w-full p-2 border rounded" onChange={handleChange} />
-          <input type="tel" name="number" placeholder="전화번호" required className="w-full p-2 border rounded" onChange={handleChange} />
-          <input type="text" name="relation" placeholder="관계" value={formData.relation} className="w-full p-2 border rounded" onChange={handleChange} />
-          <div className="flex justify-end space-x-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">취소</button>
-            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">추가</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
+const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
 
 export default function EmergencyContactScreen({ userUid }) {
-  const [contacts, setContacts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false); 
+    const navigate = useNavigate();
+    const [contacts, setContacts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showAddModal, setShowAddModal] = useState(false);
+    
+    // 🚨 정렬 상태 ('latest': 최신순, 'name': 이름순)
+    const [sortType, setSortType] = useState('latest');
 
-  const fetchContacts = async () => {
-    setError(null);
-    if (!userUid) { setLoading(false); return; } 
-    setLoading(true);
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/contacts/${userUid}`);
-      setContacts(response.data);
-    } catch (err) { setError('목록 로드 실패'); } 
-    finally { setLoading(false); }
-  };
+    const [newContact, setNewContact] = useState({ name: '', phone: '', relation: '' });
 
-  const handleDelete = async (contactId) => {
-    if (!window.confirm("정말로 삭제하시겠습니까?")) return;
+    // 연락처 불러오기
+    useEffect(() => {
+        if (userUid) fetchContacts();
+    }, [userUid]);
 
-    try {
-      // 🚨🚨🚨 쿼리 파라미터 방식 사용 (백엔드와 일치) 🚨🚨🚨
-      await axios.delete(`${API_BASE_URL}/api/contacts`, {
-        data: { 
-          uid: userUid, 
-          contactId: contactId 
+    const fetchContacts = async () => {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/api/contacts/${userUid}`);
+            setContacts(response.data);
+        } catch (error) {
+            console.error(error);
+            toast.error("연락처를 불러오지 못했습니다.");
+        } finally {
+            setLoading(false);
         }
-      }); 
-      alert('✅ 연락처 삭제 성공!');
-      fetchContacts(); 
-    } catch (err) {
-      alert(`❌ 삭제 실패: ${err.response?.data?.error || '서버 오류'}`);
-      console.error(err);
-    }
-  };
+    };
 
-  useEffect(() => {
-    if (userUid) fetchContacts();
-    else setLoading(false);
-  }, [userUid]); 
+    // 추가
+    const handleAdd = async () => {
+        if (!newContact.name || !newContact.phone) return toast.error("이름과 번호를 입력해주세요.");
+        try {
+            await axios.post(`${API_BASE_URL}/api/contacts`, { 
+                uid: userUid, 
+                ...newContact,
+                createdAt: new Date().toISOString() // 정렬을 위해 생성 시간 추가
+            });
+            toast.success("연락처가 추가되었습니다.");
+            setShowAddModal(false);
+            setNewContact({ name: '', phone: '', relation: '' });
+            fetchContacts();
+        } catch (error) {
+            toast.error("추가 실패");
+        }
+    };
 
-  if (loading) return <div className="text-center p-8">로딩 중...</div>;
-  
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white p-4 border-b flex justify-between items-center shadow-sm">
-        <Link to="/"><ChevronLeft className="w-6 h-6 text-gray-600" /></Link>
-        <h1 className="text-xl font-bold">긴급 연락처</h1>
-        <button onClick={() => setIsModalOpen(true)}><Plus className="w-6 h-6 text-blue-600" /></button>
-      </header>
-      {error && <div className="p-4 text-red-600 bg-red-100 m-4 rounded">{error}</div>}
-      <div className="p-4 space-y-2">
-        {contacts.map(contact => (
-          <ContactItem key={contact.id} contact={contact} onDelete={handleDelete} />
-        ))}
-      </div>
-      <AddContactModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={fetchContacts} userUid={userUid} />
-    </div>
-  );
+    // 삭제
+    const handleDelete = async (id) => {
+        if (!window.confirm("정말 삭제하시겠습니까?")) return;
+        try {
+            await axios.post(`${API_BASE_URL}/api/contacts/delete`, { uid: userUid, contactId: id });
+            toast.success("삭제되었습니다.");
+            fetchContacts();
+        } catch (error) {
+            toast.error("삭제 실패");
+        }
+    };
+
+    // 🚨🚨🚨 [핵심] 정렬 로직 함수 🚨🚨🚨
+    const getSortedContacts = () => {
+        const sorted = [...contacts]; // 원본 보호를 위해 복사
+        
+        if (sortType === 'latest') {
+            // 최신순 (등록일 내림차순)
+            sorted.sort((a, b) => {
+                // Firestore Timestamp 객체거나 문자열일 수 있으므로 처리
+                const dateA = a.createdAt ? new Date(a.createdAt.seconds ? a.createdAt.seconds * 1000 : a.createdAt) : new Date(0);
+                const dateB = b.createdAt ? new Date(b.createdAt.seconds ? b.createdAt.seconds * 1000 : b.createdAt) : new Date(0);
+                return dateB - dateA;
+            });
+        } else {
+            // 이름순 (가나다순)
+            sorted.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+        }
+        return sorted;
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-50 font-sans">
+            {/* 헤더 */}
+            <header className="bg-white p-4 sticky top-0 z-10 shadow-sm flex items-center justify-between">
+                <div className="flex items-center">
+                    <button onClick={() => navigate(-1)} className="p-2 -ml-2 mr-2 text-gray-600 hover:bg-gray-100 rounded-full transition">
+                        <ArrowLeft className="w-6 h-6" />
+                    </button>
+                    <h1 className="text-lg font-bold text-gray-800">긴급 연락처</h1>
+                </div>
+                <button 
+                    onClick={() => setShowAddModal(true)} 
+                    className="flex items-center text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg active:scale-95 transition"
+                >
+                    <Plus className="w-4 h-4 mr-1" /> 추가
+                </button>
+            </header>
+
+            <main className="p-5 pb-24">
+                
+                {/* 🚨 정렬 필터 버튼 */}
+                <div className="flex justify-end mb-4">
+                    <div className="bg-white p-1 rounded-xl border border-gray-200 inline-flex shadow-sm">
+                        <button 
+                            onClick={() => setSortType('latest')}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${sortType === 'latest' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            최신순
+                        </button>
+                        <button 
+                            onClick={() => setSortType('name')}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center ${sortType === 'name' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            <ArrowDownAZ className="w-3 h-3 mr-1" /> 이름순
+                        </button>
+                    </div>
+                </div>
+
+                {/* 연락처 리스트 */}
+                {loading ? (
+                    <p className="text-center text-gray-400 mt-10">로딩 중...</p>
+                ) : contacts.length === 0 ? (
+                    <div className="text-center text-gray-400 mt-20 flex flex-col items-center">
+                        <User className="w-12 h-12 mb-2 opacity-20" />
+                        <p>등록된 연락처가 없습니다.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {/* 🚨 정렬된 리스트(getSortedContacts)를 맵핑 */}
+                        {getSortedContacts().map((contact) => (
+                            <div key={contact.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center group active:scale-[0.99] transition-transform">
+                                <div className="flex items-center">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center text-blue-600 font-bold text-lg mr-4 shadow-inner">
+                                        {contact.name[0]}
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="font-bold text-gray-800">{contact.name}</h3>
+                                            {contact.relation && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md">{contact.relation}</span>}
+                                        </div>
+                                        <p className="text-sm text-gray-500 mt-0.5 flex items-center"><Phone className="w-3 h-3 mr-1"/> {contact.phone}</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => handleDelete(contact.id)}
+                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                >
+                                    <Trash2 className="w-5 h-5" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </main>
+
+            {/* 추가 모달 */}
+            {showAddModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-slide-up">
+                        <h2 className="text-xl font-bold mb-4 text-gray-800">새 연락처 추가</h2>
+                        <div className="space-y-3">
+                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 focus-within:border-blue-500 focus-within:bg-white transition-colors">
+                                <label className="block text-xs text-gray-400 font-bold mb-1">이름</label>
+                                <input 
+                                    className="w-full bg-transparent outline-none text-gray-800 font-medium" 
+                                    placeholder="예: 홍길동"
+                                    value={newContact.name}
+                                    onChange={e => setNewContact({...newContact, name: e.target.value})}
+                                />
+                            </div>
+                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 focus-within:border-blue-500 focus-within:bg-white transition-colors">
+                                <label className="block text-xs text-gray-400 font-bold mb-1">전화번호</label>
+                                <input 
+                                    className="w-full bg-transparent outline-none text-gray-800 font-medium" 
+                                    placeholder="010-0000-0000"
+                                    value={newContact.phone}
+                                    onChange={e => setNewContact({...newContact, phone: e.target.value})}
+                                />
+                            </div>
+                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 focus-within:border-blue-500 focus-within:bg-white transition-colors">
+                                <label className="block text-xs text-gray-400 font-bold mb-1">관계 (선택)</label>
+                                <input 
+                                    className="w-full bg-transparent outline-none text-gray-800 font-medium" 
+                                    placeholder="예: 가족, 친구"
+                                    value={newContact.relation}
+                                    onChange={e => setNewContact({...newContact, relation: e.target.value})}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-3 mt-6">
+                            <button onClick={() => setShowAddModal(false)} className="flex-1 py-3.5 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition">취소</button>
+                            <button onClick={handleAdd} className="flex-1 py-3.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">저장하기</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }

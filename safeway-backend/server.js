@@ -289,21 +289,32 @@ app.post('/api/contacts/delete', requireAuth, async (req, res) => {
 // =======================================================
 //           D. 위험 지역 신고 API
 // =======================================================
+// 1. 신고 글 등록 (초기화 포함)
 app.post('/api/reports', requireAuth, async (req, res) => {
     const { uid, title, type, content, location } = req.body;
     try {
         const userDoc = await db.collection('users').doc(uid).get();
         const userName = userDoc.exists ? userDoc.data().name : '익명';
+        
         const newReport = {
-            uid, writer: userName, title, type, content, location, likes: 0, comments: 0,
+            uid, 
+            writer: userName, 
+            title, 
+            type, 
+            content, 
+            location, 
+            likes: 0,    // 🚨 초기값 0 설정
+            comments: 0, // 🚨 초기값 0 설정
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             displayDate: new Date().toISOString().split('T')[0]
         };
+        
         await db.collection('reports').add(newReport);
         res.status(201).json({ message: '성공' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 2. 전체 신고 목록 조회 (최신순)
 app.get('/api/reports', async (req, res) => {
     try {
         const snapshot = await db.collection('reports').orderBy('createdAt', 'desc').get();
@@ -315,6 +326,7 @@ app.get('/api/reports', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 3. 내 신고 목록 조회
 app.get('/api/reports/user/:uid', async (req, res) => {
     try {
         const snapshot = await db.collection('reports').where('uid', '==', req.params.uid).orderBy('createdAt', 'desc').get();
@@ -324,6 +336,90 @@ app.get('/api/reports/user/:uid', async (req, res) => {
         }));
         res.status(200).json(reports);
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 🚨🚨🚨 [추가됨] 4. 댓글 작성 및 카운트 증가 API 🚨🚨🚨
+app.post('/api/reports/:id/comments', requireAuth, async (req, res) => {
+    try {
+        const { uid, content } = req.body;
+        const reportId = req.params.id;
+
+        // 작성자 이름 가져오기
+        const userDoc = await db.collection('users').doc(uid).get();
+        const userName = userDoc.exists ? userDoc.data().name : '익명';
+
+        // 댓글 컬렉션에 추가
+        await db.collection('reports').doc(reportId).collection('comments').add({
+            uid,
+            writer: userName,
+            content,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 🔥 핵심: 게시글의 댓글 수(comments) 필드를 +1 해줌
+        await db.collection('reports').doc(reportId).update({
+            comments: admin.firestore.FieldValue.increment(1)
+        });
+
+        res.status(201).json({ message: '댓글 등록 성공' });
+    } catch (e) {
+        console.error("댓글 에러:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 🚨🚨🚨 [추가됨] 5. 좋아요 토글 및 카운트 API 🚨🚨🚨
+app.post('/api/reports/:id/like', requireAuth, async (req, res) => {
+    try {
+        const { uid } = req.body;
+        const reportId = req.params.id;
+        const reportRef = db.collection('reports').doc(reportId);
+        const likeRef = reportRef.collection('likes').doc(uid); // 누가 좋아요 했는지 기록
+
+        const doc = await likeRef.get();
+
+        if (doc.exists) {
+            // 이미 좋아요 상태면 -> 취소 (삭제 및 -1)
+            await likeRef.delete();
+            await reportRef.update({ likes: admin.firestore.FieldValue.increment(-1) });
+            res.json({ message: '취소됨', liked: false });
+        } else {
+            // 좋아요 안 한 상태면 -> 추가 (기록 및 +1)
+            await likeRef.set({ createdAt: admin.firestore.FieldValue.serverTimestamp() });
+            await reportRef.update({ likes: admin.firestore.FieldValue.increment(1) });
+            res.json({ message: '성공', liked: true });
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 🚨🚨🚨 [신규] 6. 신고 삭제 API (본인만 삭제 가능) 🚨🚨🚨
+app.delete('/api/reports/:id', requireAuth, async (req, res) => {
+    try {
+        const { uid } = req.body; // 요청한 사람의 ID
+        const reportId = req.params.id; // 삭제할 글 ID
+        
+        const reportRef = db.collection('reports').doc(reportId);
+        const doc = await reportRef.get();
+
+        if (!doc.exists) {
+            return res.status(404).json({ error: '게시글이 존재하지 않습니다.' });
+        }
+
+        // 본인 확인 (글쓴이 UID와 요청한 UID가 같은지)
+        if (doc.data().uid !== uid) {
+            return res.status(403).json({ error: '삭제 권한이 없습니다.' });
+        }
+
+        // 삭제 실행
+        await reportRef.delete();
+        res.json({ message: '삭제 성공' });
+
+    } catch (e) {
+        console.error("삭제 실패:", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // =======================================================

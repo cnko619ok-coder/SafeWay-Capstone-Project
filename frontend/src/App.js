@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useKakaoLoader } from 'react-kakao-maps-sdk'; // 🚨 Loader 임포트
 import { Toaster } from 'sonner';
@@ -20,22 +20,11 @@ import ProfileEditScreen from './ProfileEditScreen';
 import NotificationSettingsScreen from './NotificationSettingsScreen';
 import AccountSettingsScreen from './AccountSettingsScreen';
 import NavigationScreen from './NavigationScreen';
+import { Shield } from 'lucide-react'; // 🚨 Shield 아이콘 import 필요
+import SplashScreen from './SplashScreen';
 
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'any';
 
-// 🚨 로딩 화면 컴포넌트
-function SplashScreen() {
-    return (
-        <div className="min-h-screen bg-blue-500 flex flex-col items-center justify-center text-white font-sans animate-pulse">
-            {/* 로고 아이콘 (Shield) */}
-            <svg className="w-24 h-24 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-            <h1 className="text-4xl font-extrabold tracking-widest">SafeWay</h1>
-            <p className="mt-2 text-blue-100 text-sm">당신의 안전한 귀갓길 파트너</p>
-        </div>
-    );
-}
 
 function App() {
     // 로그인 상태와 사용자 UID를 저장할 상태
@@ -49,27 +38,20 @@ function App() {
       libraries: ["services", "clusterer", "drawing"], // 주소 검색에 필수!
     });
 
-    // 🚨 초기 로딩 효과 (2초)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-        setIsLoading(false);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, []);
+// 로그인 성공 핸들러
+  const handleLoginSuccess = (uid) => {
+      setUserUid(uid);
+      setIsLoggedIn(true);
+  };
 
-    // AuthScreen에서 로그인 성공 시 호출될 함수
-    const handleLoginSuccess = (uid) => {
-        setUserUid(uid); // UID 저장
-        setIsLoggedIn(true); // 로그인 상태를 true로 변경
-    };
+  // 로딩 화면 종료 핸들러
+  const handleSplashFinish = () => {
+      setIsLoading(false);
+  };
 
-    if (!isLoggedIn && window.location.pathname !== '/login') {
-      // (선택 사항) 로딩 중 처리 등을 할 수 있습니다.
-    }
-
-    // 🚨 로딩 중이면 스플래시 화면 보여주기
+  // 🚨 로딩 중이면 SplashScreen 컴포넌트 표시
   if (isLoading) {
-      return <SplashScreen />;
+      return <SplashScreen onFinish={handleSplashFinish} />;
   }
 
     return (
