@@ -128,6 +128,22 @@ export default function RouteSearchScreen({ userUid }) {
         }
     };
 
+    // 🚨 이걸 아까 알려드린 코드로 수정해야 합니다!
+const handleDeleteRecent = async (historyId, e) => {
+    e.stopPropagation(); 
+    if (!userUid) return;
+
+    try {
+        // 서버에 "이거 하나만 지워줘" 요청
+        await axios.delete(`${API_BASE_URL}/api/history/item`, {
+            data: { uid: userUid, historyId: historyId }
+        });
+        fetchHistory(); // 목록 새로고침
+    } catch (error) {
+        console.error("삭제 실패:", error);
+    }
+};
+
     // 현위치 버튼 핸들러 (기존 로직 유지)
     const handleCurrentLocation = () => {
         if (!navigator.geolocation) return alert("위치 정보 불가");
@@ -164,8 +180,8 @@ export default function RouteSearchScreen({ userUid }) {
             const ps = new window.kakao.maps.services.Places();
             const options = myPos ? {
                 location: new window.kakao.maps.LatLng(myPos.lat, myPos.lng),
-                radius: 2000, 
-                sort: window.kakao.maps.services.SortBy.DISTANCE
+                //radius: 2000, 
+                sort: window.kakao.maps.services.SortBy.ACCURACY
             } : {};
             
             ps.keywordSearch(keyword, (data, status) => {
@@ -291,13 +307,36 @@ export default function RouteSearchScreen({ userUid }) {
                                 {recentDestinations.length > 0 && <button type="button" onClick={() => setRecentDestinations([])} className="text-xs text-gray-400 hover:text-red-500">전체 삭제</button>}
                             </div>
                             <div className="space-y-3">
-                                {recentDestinations.map((dest, idx) => (
-                                    <button key={idx} type="button" onClick={() => setEndLocation(dest.name)} className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md flex items-center">
-                                        <div className="bg-gray-50 p-3 rounded-xl text-gray-400"><MapIcon className="w-5 h-5" /></div>
-                                        <div className="ml-4 text-left"><p className="font-bold text-gray-800">{dest.name}</p><p className="text-xs text-gray-400 mt-0.5">{dest.address}</p></div>
-                                    </button>
-                                ))}
-                            </div>
+    {recentDestinations.map((dest) => (
+        // 🚨 div로 감싸서 배치 (key는 idx 대신 고유 id 사용 권장)
+        <div key={dest.id} className="relative group">
+            
+            {/* 1. 본문 버튼 (누르면 도착지 설정) */}
+            <button 
+                type="button" 
+                onClick={() => setEndLocation(dest.name)} 
+                className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md flex items-center text-left pr-12" // pr-12로 오른쪽 여백 확보
+            >
+                <div className="bg-gray-50 p-3 rounded-xl text-gray-400">
+                    <MapIcon className="w-5 h-5" />
+                </div>
+                <div className="ml-4">
+                    <p className="font-bold text-gray-800">{dest.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{dest.address || '최근 검색'}</p>
+                </div>
+            </button>
+
+            {/* 2. 🚨 삭제 버튼 (우측 상단 X 아이콘) */}
+            <button 
+                onClick={(e) => handleDeleteRecent(dest.id, e)} 
+                className="absolute top-1/2 right-4 transform -translate-y-1/2 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-10"
+                title="삭제"
+            >
+                <X className="w-4 h-4" />
+            </button>
+        </div>
+    ))}
+</div>
                         </section>
                     </>
                 ) : (

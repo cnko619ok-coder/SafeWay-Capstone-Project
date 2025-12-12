@@ -528,6 +528,20 @@ app.delete('/api/history/all/:uid', async (req, res) => {
     }
 });
 
+app.delete('/api/history/item', requireAuth, async (req, res) => {
+    try {
+        const { uid, historyId } = req.body; // 지울 사람 ID, 지울 기록 ID
+        
+        // 내 기록 삭제 요청
+        await db.collection('users').doc(uid).collection('history').doc(historyId).delete();
+        
+        res.json({ message: '삭제 성공' });
+    } catch (e) {
+        console.error("기록 삭제 실패:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // =======================================================
 //           G. 카카오 모빌리티 길찾기 API (3가지 경로 분석)
 // =======================================================
