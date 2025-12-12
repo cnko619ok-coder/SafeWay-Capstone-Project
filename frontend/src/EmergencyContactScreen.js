@@ -199,8 +199,8 @@ export default function EmergencyContactScreen({ userUid }) {
                             </div>
                         </div>
                         <div className="flex gap-3 mt-6">
-                            <button onClick={() => setShowAddModal(false)} className="flex-1 py-3.5 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition">취소</button>
-                            <button onClick={handleAdd} className="flex-1 py-3.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">저장하기</button>
+                             <button onClick={() => setShowAddModal(false)} className="flex-1 py-3.5 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition">취소</button>
+                             <button onClick={handleAdd} className="flex-1 py-3.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">저장하기</button>
                         </div>
                     </div>
                 </div>
