@@ -2,22 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, MapPin, ArrowLeft, Navigation, Map as MapIcon, Crosshair, Star, X, MinusCircle, Shield, Clock, Camera, Lightbulb, Scale } from 'lucide-react';
+import { Search, MapPin, ArrowLeft, Clock, Map as MapIcon, Crosshair, Star, MinusCircle, Shield, Camera, Lightbulb, Scale } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-// 🚨 ngrok 주소 확인 (바뀌었다면 수정 필요)
+// 🚨 ngrok 주소 확인
 const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
 
-// 로컬 환경 백업용 가상 경로
+// 로컬 환경 백업용 가상 경로 (기존 유지)
 const DUMMY_PATH = [
   { lat: 37.5668, lng: 126.9790 }, { lat: 37.5670, lng: 126.9792 }, { lat: 37.5672, lng: 126.9794 }, 
 ];
-
-const DUMMY_ROUTE_DATA = {
-    safety: { score: 0, distance: '...', time: '...', cctv: 0, lights: 0 },
-    shortest: { score: 0, distance: '...', time: '...', cctv: 0, lights: 0 },
-    balanced: { score: 0, distance: '...', time: '...', cctv: 0, lights: 0 },
-};
 
 function RouteResultCard({ title, data, color, onClick, icon: Icon, isBest }) {
     const colorMap = {
@@ -46,7 +40,8 @@ function RouteResultCard({ title, data, color, onClick, icon: Icon, isBest }) {
     );
 }
 
-export default function RouteSearchScreen() {
+// 🚨 userUid props 추가 (이게 있어야 개인화가 됩니다!)
+export default function RouteSearchScreen({ userUid }) {
     const [startLocation, setStartLocation] = useState('');
     const [endLocation, setEndLocation] = useState('');
     const [loading, setLoading] = useState(false);
@@ -55,31 +50,86 @@ export default function RouteSearchScreen() {
     const [searchResult, setSearchResult] = useState(null);
     const [calculatedPath, setCalculatedPath] = useState([]);
 
-    const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem('safeway_favorites')) || []);
-    const [recentDestinations, setRecentDestinations] = useState(() => JSON.parse(localStorage.getItem('safeway_recent_destinations')) || []);
+    // 🚨 [수정됨] 로컬 스토리지 제거 -> 빈 배열로 초기화
+    const [favorites, setFavorites] = useState([]);
+    const [recentDestinations, setRecentDestinations] = useState([]);
     const [isEditing, setIsEditing] = useState(false);
-
-    useEffect(() => { localStorage.setItem('safeway_favorites', JSON.stringify(favorites)); }, [favorites]);
-    useEffect(() => { localStorage.setItem('safeway_recent_destinations', JSON.stringify(recentDestinations)); }, [recentDestinations]);
-
-    const handleAddFavorite = () => {
-        if (!endLocation) return alert("도착지를 먼저 입력해주세요.");
-        const name = prompt("이 장소의 별명을 입력해주세요 (예: 헬스장, 학교)");
-        if (name) setFavorites([{ id: Date.now(), name, address: endLocation }, ...favorites]);
-    };
-    const handleDeleteFavorite = (id, e) => { e.stopPropagation(); if(window.confirm("삭제하시겠습니까?")) setFavorites(favorites.filter(fav => fav.id !== id)); };
-    const handleDeleteRecent = (idx) => setRecentDestinations(prev => prev.filter((_, i) => i !== idx));
-
-    // 🚨 내 위치 상태 추가 (검색 중심점용)
+    
+    // 🚨 [신규] 내 위치 저장용
     const [myPos, setMyPos] = useState(null);
 
+    // 🚨🚨🚨 [신규] 데이터 불러오기 (서버 API 사용) 🚨🚨🚨
+    useEffect(() => {
+        if (userUid) {
+            fetchFavorites();
+            fetchHistory();
+        }
+    }, [userUid]);
+
+    const fetchFavorites = async () => {
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/favorites/${userUid}`);
+            setFavorites(res.data);
+        } catch (e) { console.error("즐겨찾기 로드 실패", e); }
+    };
+
+    const fetchHistory = async () => {
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/history/${userUid}`);
+            setRecentDestinations(res.data);
+        } catch (e) { console.error("히스토리 로드 실패", e); }
+    };
+
+    // 🚨 [수정됨] 즐겨찾기 추가 (서버로 전송)
+    const handleAddFavorite = async () => {
+        if (!endLocation) return alert("도착지를 먼저 입력해주세요.");
+        if (!userUid) return alert("로그인이 필요합니다.");
+
+        const name = prompt("이 장소의 별명을 입력해주세요 (예: 헬스장, 학교)");
+        if (name) {
+            try {
+                await axios.post(`${API_BASE_URL}/api/favorites`, { 
+                    uid: userUid, 
+                    name: name, 
+                    address: endLocation 
+                });
+                alert("즐겨찾기에 추가되었습니다.");
+                fetchFavorites(); // 목록 갱신
+            } catch (e) {
+                alert("추가 실패");
+            }
+        }
+    };
+
+    // 🚨 [수정됨] 즐겨찾기 삭제 (서버로 전송)
+    const handleDeleteFavorite = async (id, e) => { 
+        e.stopPropagation(); 
+        if(window.confirm("삭제하시겠습니까?")) {
+            try {
+                await axios.post(`${API_BASE_URL}/api/favorites/delete`, { 
+                    uid: userUid, 
+                    favoriteId: id 
+                });
+                fetchFavorites();
+            } catch (e) { alert("삭제 실패"); }
+        }
+    };
+
+    // 🚨 [수정됨] 최근 목적지 삭제 (화면에서만 임시 삭제)
+    // (서버 개별 삭제 API가 없다면 화면에서만 지우고, 전체 삭제 기능 등을 활용)
+    const handleDeleteRecent = (idx) => {
+        // 임시로 화면에서 제거 (완벽하게 하려면 API 필요)
+        setRecentDestinations(prev => prev.filter((_, i) => i !== idx));
+    };
+
+    // 현위치 버튼 핸들러 (기존 로직 유지)
     const handleCurrentLocation = () => {
         if (!navigator.geolocation) return alert("위치 정보 불가");
         setLoading(true);
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 const { latitude, longitude } = pos.coords;
-                setMyPos({ lat: latitude, lng: longitude }); // 👈 내 위치 저장!
+                setMyPos({ lat: latitude, lng: longitude }); 
                 if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
                     const geocoder = new window.kakao.maps.services.Geocoder();
                     geocoder.coord2Address(longitude, latitude, (result, status) => {
@@ -98,67 +148,61 @@ export default function RouteSearchScreen() {
         );
     };
 
-    // 🚨🚨🚨 [수정] 장소 검색(Keyword Search) 기능으로 변경 🚨🚨🚨
+    // 장소 검색 함수 (기존 로직 유지)
     const searchAddressToCoordinate = (keyword) => {
         return new Promise((resolve, reject) => {
             if (!window.kakao || !window.kakao.maps || !window.kakao.maps.services) {
                 reject(new Error("카카오맵이 아직 로딩되지 않았습니다."));
                 return;
             }
-
-            // 1. 장소 검색 객체 생성
             const ps = new window.kakao.maps.services.Places();
-
-            // 검색 옵션: 내 위치가 있으면 그 주변 2km(2000m) 우선 검색
             const options = myPos ? {
                 location: new window.kakao.maps.LatLng(myPos.lat, myPos.lng),
                 radius: 2000, 
-                sort: window.kakao.maps.services.SortBy.DISTANCE // 거리순 정렬
+                sort: window.kakao.maps.services.SortBy.DISTANCE
             } : {};
             
-            // 2. 키워드로 검색 (예: "강남역", "스타벅스")
             ps.keywordSearch(keyword, (data, status) => {
                 if (status === window.kakao.maps.services.Status.OK) {
-                    // 가장 가까운 첫 번째 결과 사용
                     resolve({ lat: parseFloat(data[0].y), lng: parseFloat(data[0].x) });
-                    console.log(`📍 검색 결과: ${data[0].place_name} (${data[0].address_name})`);
                 } else {
-                    // 장소 검색 실패 시 주소 검색 시도 (기존 로직 유지)
                     const geocoder = new window.kakao.maps.services.Geocoder();
                     geocoder.addressSearch(keyword, (res, stat) => {
                         if (stat === 'OK') resolve({ lat: parseFloat(res[0].y), lng: parseFloat(res[0].x) });
                         else reject(new Error("검색 결과 없음"));
                     });
                 }
-            }, options); // 👈 옵션 추가됨
+            }, options);
         });
     };
 
+    // 검색 핸들러 (기존 로직 유지 + 히스토리 저장 추가)
     const handleSearch = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
         setSearchResult(null);
 
-        if (endLocation.trim()) {
-            setRecentDestinations(prev => [{ name: endLocation, address: '최근 검색' }, ...prev.filter(d => d.name !== endLocation)].slice(0, 5));
+        // 🚨 [추가됨] 검색 시 서버에 최근 목적지 저장
+        if (endLocation.trim() && userUid) {
+            try {
+                await axios.post(`${API_BASE_URL}/api/history`, { 
+                    uid: userUid, 
+                    name: endLocation, 
+                    address: '최근 검색' 
+                });
+                fetchHistory(); // 목록 갱신
+            } catch (e) { console.error("히스토리 저장 실패"); }
         }
 
         try {
             let pathPoints = [];
             try {
-                // 🚨 장소 이름으로 좌표 찾기
                 const startCoords = await searchAddressToCoordinate(startLocation);
                 const endCoords = await searchAddressToCoordinate(endLocation);
-                
-                pathPoints = [
-                    startCoords,
-                    //{ lat: (startCoords.lat + endCoords.lat) / 2, lng: (startCoords.lng + endCoords.lng) / 2 }, 
-                    endCoords
-                ];
+                pathPoints = [startCoords, endCoords];
             } catch (geoError) {
                 console.warn("지도 API 실패:", geoError);
-                // 실패 시 알림 띄우고 가상 데이터 사용
                 alert(`⚠️ ${geoError.message}\n(가상 경로로 대체합니다)`);
                 pathPoints = DUMMY_PATH;
                 if (!startLocation) setStartLocation('서울 시청');
@@ -167,22 +211,13 @@ export default function RouteSearchScreen() {
             
             setCalculatedPath(pathPoints);
 
-            // 🚨🚨🚨 [수정] 백엔드 분석 API 호출 🚨🚨🚨
-            // 이제 pathPoints 배열이 아니라 start, end 객체를 보냅니다.
             const response = await axios.post(`${API_BASE_URL}/api/route/analyze`, {
                 start: pathPoints[0],
                 end: pathPoints[pathPoints.length - 1]
             });
             
-            // 백엔드에서 완성된 3가지 데이터를 받음
             const { safety, shortest, balanced } = response.data;
-
-            
-                 setSearchResult({
-                safety,
-                shortest,
-                balanced
-            });
+            setSearchResult({ safety, shortest, balanced });
 
         } catch (err) { 
             console.error(err);
@@ -195,7 +230,6 @@ export default function RouteSearchScreen() {
     const goToMapScreen = () => navigate('/route/result', { 
         state: { 
             searchData: { start: startLocation, end: endLocation }, 
-            // 🚨 calculatedPath가 비어있을 수 있으므로 안전장치 추가
             pathPoints: calculatedPath.length > 0 ? calculatedPath : DUMMY_PATH, 
             routeData: searchResult 
         } 
@@ -226,7 +260,6 @@ export default function RouteSearchScreen() {
                     </button>
                 </form>
 
-                {/* 하단 영역: 검색 결과 유무에 따라 변경 */}
                 {!searchResult ? (
                     <>
                         {/* 즐겨찾기 목록 */}
@@ -262,7 +295,6 @@ export default function RouteSearchScreen() {
                         </section>
                     </>
                 ) : (
-                    // 🚨 결과 리스트
                     <section className="animate-fade-in-up space-y-4">
                         <div className="flex justify-between items-center px-1">
                             <h3 className="text-lg font-bold text-gray-800">추천 경로</h3>
