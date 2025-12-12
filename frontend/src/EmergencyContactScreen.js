@@ -162,8 +162,12 @@ export default function EmergencyContactScreen({ userUid }) {
 
             {/* 추가 모달 */}
             {showAddModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-slide-up">
+                <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-slide-up relative">{/* 닫기 버튼 추가 (편의성) */}
+                        <button onClick={() => setShowAddModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                            <X className="w-6 h-6" />
+                        </button>
+
                         <h2 className="text-xl font-bold mb-4 text-gray-800">새 연락처 추가</h2>
                         <div className="space-y-3">
                             <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 focus-within:border-blue-500 focus-within:bg-white transition-colors">
