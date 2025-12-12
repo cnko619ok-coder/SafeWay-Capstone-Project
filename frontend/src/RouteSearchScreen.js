@@ -76,7 +76,8 @@ export default function RouteSearchScreen({ userUid }) {
     const fetchHistory = async () => {
         try {
             const res = await axios.get(`${API_BASE_URL}/api/history/${userUid}`);
-            setRecentDestinations(res.data);
+            const validData = res.data.filter(item => item.name && item.name.trim() !== '');
+            setRecentDestinations(validData);
         } catch (e) { console.error("히스토리 로드 실패", e); }
     };
 
@@ -115,11 +116,16 @@ export default function RouteSearchScreen({ userUid }) {
         }
     };
 
-    // 🚨 [수정됨] 최근 목적지 삭제 (화면에서만 임시 삭제)
-    // (서버 개별 삭제 API가 없다면 화면에서만 지우고, 전체 삭제 기능 등을 활용)
-    const handleDeleteRecent = (idx) => {
-        // 임시로 화면에서 제거 (완벽하게 하려면 API 필요)
-        setRecentDestinations(prev => prev.filter((_, i) => i !== idx));
+    /// 🚨 [수정됨] 최근 목적지 "전체 삭제" (서버 API 호출)
+    const handleDeleteAllRecent = async () => {
+        if (!window.confirm("최근 검색 기록을 모두 삭제하시겠습니까?")) return;
+        try {
+            await axios.delete(`${API_BASE_URL}/api/history/all/${userUid}`);
+            setRecentDestinations([]); // 화면에서도 즉시 비움
+        } catch (e) {
+            console.error(e);
+            alert("삭제 실패");
+        }
     };
 
     // 현위치 버튼 핸들러 (기존 로직 유지)

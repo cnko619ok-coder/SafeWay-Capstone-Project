@@ -504,6 +504,30 @@ app.get('/api/history/:uid', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 🚨🚨🚨 [신규] 최근 목적지 전체 삭제 API 🚨🚨🚨
+app.delete('/api/history/all/:uid', async (req, res) => {
+    try {
+        const historyRef = db.collection('users').doc(req.params.uid).collection('history');
+        const snapshot = await historyRef.get();
+        
+        if (snapshot.empty) {
+            return res.json({ message: '삭제할 기록이 없습니다.' });
+        }
+
+        // 배치(Batch) 작업으로 한 번에 삭제
+        const batch = db.batch();
+        snapshot.docs.forEach((doc) => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+
+        res.json({ message: '전체 삭제 성공' });
+    } catch (e) {
+        console.error("기록 삭제 실패:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // =======================================================
 //           G. 카카오 모빌리티 길찾기 API (3가지 경로 분석)
 // =======================================================
