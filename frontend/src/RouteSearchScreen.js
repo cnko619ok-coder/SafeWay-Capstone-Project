@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, MapPin, ArrowLeft, Clock, Map as MapIcon, Crosshair, Star, MinusCircle, Shield, Camera, Lightbulb, Scale } from 'lucide-react';
+import { Search, MapPin, ArrowLeft, Clock, Map as MapIcon, Crosshair, Star, MinusCircle, Shield, Camera, Lightbulb, Scale, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 // 🚨 ngrok 주소 확인
