@@ -106,14 +106,13 @@ function App() {
                   {/* 🚨 상세 화면 라우트 추가 */}
                   <Route 
                       path="/profile/reports" 
-                      element={isLoggedIn ? <MyReportsScreen /> : <Navigate to="/login" />} />
+                      element={isLoggedIn ? <MyReportsScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                  />
                   <Route 
                       path="/profile/history" 
                       element={isLoggedIn ? <ReturnHistoryScreen userUid={userUid} /> : <Navigate to="/login" />} 
                   /> 
-                  <Route 
-                      path="/report-board/:id" 
-                      element={isLoggedIn ? <ReportDetailScreen userUid={userUid} /> : <Navigate to="/login" />} />
+                  <Route path="/report-board/:id" element={<ReportDetailScreen userUid={userUid} />} />
 
                   {/* 🚨 SOS 화면 라우트 추가 */}
                   <Route 

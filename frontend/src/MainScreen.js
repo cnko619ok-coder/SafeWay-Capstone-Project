@@ -87,6 +87,25 @@ export default function MainScreen({ userUid }) {
                         <li>• 위험을 느끼면 즉시 SOS 버튼을 눌러주세요.</li>
                     </ul>
                 </section>
+
+                {/* 🚨🚨🚨 [추가됨] 긴급 전화번호 섹션 (이미지 디자인 적용) 🚨🚨🚨 */}
+        <section>
+          <h2 className="text-lg font-bold text-gray-800 mb-3">긴급 전화번호</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {/* 경찰 신고 112 */}
+            <a href="tel:112" className="block bg-red-50 border border-red-100 p-5 rounded-2xl active:scale-95 transition-transform hover:bg-red-100">
+              <div className="text-xs font-bold text-gray-600 mb-1">경찰 신고</div>
+              <div className="text-3xl font-extrabold text-red-600">112</div>
+            </a>
+
+            {/* 범죄 신고 182 */}
+            <a href="tel:182" className="block bg-red-50 border border-red-100 p-5 rounded-2xl active:scale-95 transition-transform hover:bg-red-100">
+              <div className="text-xs font-bold text-gray-600 mb-1">범죄 신고</div>
+              <div className="text-3xl font-extrabold text-red-600">182</div>
+            </a>
+          </div>
+        </section>
+        
             </main>
 
             {/* 🚨 SOS 플로팅 버튼 */}

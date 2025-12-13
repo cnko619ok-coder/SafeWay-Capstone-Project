@@ -1,16 +1,25 @@
 // frontend/src/SOSScreen.js
 
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios'; // 🚨 API 호출을 위해 추가
 import { ArrowLeft, Phone, AlertTriangle, X, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
-export default function SOSScreen() {
+// 🚨 API 주소 확인
+const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
+
+// 🚨 userUid를 props로 받아와야 합니다.
+export default function SOSScreen({ userUid }) {
     const [isPressing, setIsPressing] = useState(false);
     const [progress, setProgress] = useState(0);
     const [isActivated, setIsActivated] = useState(false);
     const [countdown, setCountdown] = useState(3);
     
-    // 🚨 내 위치 정보 상태 (기본값은 빈 문자열)
+    // 🚨 내 비상연락처 목록 상태
+    const [contacts, setContacts] = useState([]);
+
+    // 내 위치 정보 상태
     const [locationInfo, setLocationInfo] = useState({
         lat: null,
         lng: null,
@@ -21,31 +30,45 @@ export default function SOSScreen() {
     const pressTimer = useRef(null);
     const countdownTimer = useRef(null);
 
-    // 🚨 1. 화면이 켜지면 내 위치를 미리 가져옵니다.
+    // 🚨 1. 화면이 켜지면 내 위치 + 비상연락처를 가져옵니다.
     useEffect(() => {
+        // (1) 위치 가져오기
         if (!navigator.geolocation) {
             setLocationStatus('위치 정보 사용 불가');
-            return;
+        } else {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    // 구글 지도 링크 생성 (표준 포맷으로 수정)
+                    const link = `https://www.google.com/maps?q=${lat},${lng}`;
+                    
+                    setLocationInfo({ lat, lng, mapLink: link });
+                    setLocationStatus('현위치 확보 완료');
+                },
+                (error) => {
+                    console.error("위치 파악 실패:", error);
+                    setLocationStatus('위치 파악 실패 (GPS 확인 필요)');
+                },
+                { enableHighAccuracy: true }
+            );
         }
 
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                // 구글 지도 링크 생성 (가장 호환성이 좋음)
-                const link = `https://www.google.com/maps?q=${lat},${lng}`;
-                
-                setLocationInfo({ lat, lng, mapLink: link });
-                setLocationStatus('현위치 확보 완료');
-                console.log("📍 SOS 위치 확보:", link);
-            },
-            (error) => {
-                console.error("위치 파악 실패:", error);
-                setLocationStatus('위치 파악 실패 (GPS 확인 필요)');
-            },
-            { enableHighAccuracy: true } // 높은 정확도 사용
-        );
-    }, []);
+        // (2) 비상연락처 목록 가져오기
+        if (userUid) {
+            fetchContacts();
+        }
+    }, [userUid]);
+
+    // 서버에서 연락처 가져오는 함수
+    const fetchContacts = async () => {
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/contacts/${userUid}`);
+            setContacts(res.data);
+        } catch (e) {
+            console.error("연락처 로드 실패:", e);
+        }
+    };
 
     const triggerSOS = () => {
         setIsActivated(true);
@@ -62,19 +85,42 @@ export default function SOSScreen() {
     };
 
     const sendSMS = () => {
-        const phoneNumbers = "010-1234-5678"; // (나중에 DB에서 가져온 번호로 교체 가능)
+        // 🚨 예외 처리: 연락처가 없는 경우
+        if (contacts.length === 0) {
+            alert("등록된 비상연락처가 없습니다! [긴급 연락처] 메뉴에서 먼저 등록해주세요.");
+            setIsActivated(false);
+            setCountdown(3);
+            setProgress(0);
+            return;
+        }
+
+        // 🚨 3. 저장된 연락처들의 전화번호만 추출해서 쉼표로 연결
+        // 예: "01012345678,01098765432"
+        const phoneNumbers = contacts.map(c => c.phoneNumber).join(',');
         
-        // 🚨 2. 확보된 위치 링크를 문자에 포함
+        // 확보된 위치 링크를 문자에 포함
         const locationMsg = locationInfo.mapLink 
             ? `현재 제 위치입니다: ${locationInfo.mapLink}` 
             : `(위치 정보를 가져오지 못했습니다)`;
             
         const message = `[SafeWay 긴급 알림] 🚨 지금 위험한 상황입니다! 도와주세요.\n${locationMsg}`;
         
-        // 문자 앱 실행
-        window.location.href = `sms:${phoneNumbers}?body=${encodeURIComponent(message)}`;
+        // 🚨 OS별 문자 앱 링크 처리 (아이폰/안드로이드 호환성)
+        const userAgent = navigator.userAgent.toLowerCase();
+        let smsUrl = '';
+
+        if (userAgent.indexOf('iphone') > -1 || userAgent.indexOf('ipad') > -1) {
+             // iOS
+            smsUrl = `sms:${phoneNumbers}&body=${encodeURIComponent(message)}`;
+        } else {
+             // Android
+            smsUrl = `sms:${phoneNumbers}?body=${encodeURIComponent(message)}`;
+        }
         
-        // 문자 앱 실행 후에는 앱의 SOS 상태 초기화
+        // 문자 앱 실행
+        window.location.href = smsUrl;
+        
+        // 앱 상태 초기화
         setTimeout(() => {
             setIsActivated(false);
             setCountdown(3);
@@ -141,9 +187,9 @@ export default function SOSScreen() {
                         <>
                             <div className="mb-10">
                                 <h2 className="text-2xl font-bold text-gray-800 mb-2">위급 상황인가요?</h2>
-                                <p className="text-gray-500">버튼을 꾹 누르면 보호자에게<br/>현재 위치와 알림이 전송됩니다.</p>
+                                <p className="text-gray-500">버튼을 꾹 누르면 <span className="text-red-500 font-bold">{contacts.length}명의 보호자</span>에게<br/>현재 위치와 알림이 전송됩니다.</p>
                                 
-                                {/* 🚨 위치 상태 표시 (GPS 잡혔는지 확인용) */}
+                                {/* 위치 상태 표시 */}
                                 <div className={`mt-4 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${locationInfo.lat ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                                     <MapPin className="w-3 h-3 mr-1" />
                                     {locationStatus}

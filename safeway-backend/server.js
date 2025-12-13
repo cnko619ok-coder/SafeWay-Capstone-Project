@@ -422,6 +422,31 @@ app.delete('/api/reports/:id', requireAuth, async (req, res) => {
     }
 });
 
+// 🚨🚨🚨 [신규] 특정 신고글 1개 상세 조회 API 🚨🚨🚨
+app.get('/api/reports/detail/:id', async (req, res) => {
+    try {
+        const reportId = req.params.id;
+        const doc = await db.collection('reports').doc(reportId).get();
+        
+        if (!doc.exists) {
+            return res.status(404).json({ error: '게시글을 찾을 수 없습니다.' });
+        }
+
+        // 게시글 데이터 + 댓글 목록도 같이 가져오기 (선택사항)
+        const reportData = { id: doc.id, ...doc.data() };
+        
+        // 날짜 변환
+        if (reportData.createdAt) {
+            reportData.createdAt = reportData.createdAt.toDate();
+        }
+
+        res.json(reportData);
+    } catch (e) {
+        console.error("상세 조회 실패:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // =======================================================
 //           E. 사용자 프로필 API
 // =======================================================
