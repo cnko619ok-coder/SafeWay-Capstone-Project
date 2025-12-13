@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Search, MapPin, ArrowLeft, Clock, Map as MapIcon, Crosshair, Star, MinusCircle, Shield, Camera, Lightbulb, Scale, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 // 🚨 ngrok 주소 확인
 const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
@@ -58,11 +59,15 @@ export default function RouteSearchScreen({ userUid }) {
     // 🚨 [신규] 내 위치 저장용
     const [myPos, setMyPos] = useState(null);
 
-    // 🚨🚨🚨 [신규] 데이터 불러오기 (서버 API 사용) 🚨🚨🚨
+    // 🚨 1. 데이터 불러오기 및 초기화 (격리 강화)
     useEffect(() => {
         if (userUid) {
             fetchFavorites();
             fetchHistory();
+        } else {
+            // 🚨 로그아웃 상태면 목록을 즉시 비움 (공유 방지)
+            setFavorites([]);
+            setRecentDestinations([]);
         }
     }, [userUid]);
 
@@ -83,8 +88,8 @@ export default function RouteSearchScreen({ userUid }) {
 
     // 🚨 [수정됨] 즐겨찾기 추가 (서버로 전송)
     const handleAddFavorite = async () => {
-        if (!endLocation) return alert("도착지를 먼저 입력해주세요.");
-        if (!userUid) return alert("로그인이 필요합니다.");
+        if (!endLocation) return toast.error("도착지를 입력해주세요.");
+        if (!userUid) return toast.error("로그인이 필요합니다.");
 
         const name = prompt("이 장소의 별명을 입력해주세요 (예: 헬스장, 학교)");
         if (name) {
@@ -96,9 +101,7 @@ export default function RouteSearchScreen({ userUid }) {
                 });
                 alert("즐겨찾기에 추가되었습니다.");
                 fetchFavorites(); // 목록 갱신
-            } catch (e) {
-                alert("추가 실패");
-            }
+            } catch (e) { toast.error("추가 실패"); }
         }
     };
 
@@ -112,37 +115,36 @@ export default function RouteSearchScreen({ userUid }) {
                     favoriteId: id 
                 });
                 fetchFavorites();
-            } catch (e) { alert("삭제 실패"); }
+            } catch (e) { toast.error("삭제 실패"); }
         }
     };
 
-    /// 🚨 [수정됨] 최근 목적지 "전체 삭제" (서버 API 호출)
+    // 🚨🚨🚨 [수정됨] 삭제 로직 강화 (경로 파라미터 사용) 🚨🚨🚨
+    const handleDeleteRecent = async (historyId, e) => {
+        e.stopPropagation(); 
+        if (!userUid) return;
+
+        // 화면에서 먼저 지워서 반응 속도 높임 (낙관적 업데이트)
+        setRecentDestinations(prev => prev.filter(item => item.id !== historyId));
+
+        try {
+            // 바뀐 API 주소 사용: /api/history/:uid/:historyId
+            await axios.delete(`${API_BASE_URL}/api/history/${userUid}/${historyId}`);
+            // 혹시 모르니 서버 데이터로 다시 동기화
+            fetchHistory();
+        } catch (error) { 
+            console.error("삭제 실패:", error);
+            fetchHistory(); // 실패하면 원래대로 복구
+        }
+    };
+
     const handleDeleteAllRecent = async () => {
-        if (!window.confirm("최근 검색 기록을 모두 삭제하시겠습니까?")) return;
+        if (!window.confirm("기록을 모두 삭제하시겠습니까?")) return;
+        setRecentDestinations([]); // 즉시 비움
         try {
             await axios.delete(`${API_BASE_URL}/api/history/all/${userUid}`);
-            setRecentDestinations([]); // 화면에서도 즉시 비움
-        } catch (e) {
-            console.error(e);
-            alert("삭제 실패");
-        }
+        } catch (e) { toast.error("삭제 실패"); }
     };
-
-    // 🚨 이걸 아까 알려드린 코드로 수정해야 합니다!
-const handleDeleteRecent = async (historyId, e) => {
-    e.stopPropagation(); 
-    if (!userUid) return;
-
-    try {
-        // 서버에 "이거 하나만 지워줘" 요청
-        await axios.delete(`${API_BASE_URL}/api/history/item`, {
-            data: { uid: userUid, historyId: historyId }
-        });
-        fetchHistory(); // 목록 새로고침
-    } catch (error) {
-        console.error("삭제 실패:", error);
-    }
-};
 
     // 현위치 버튼 핸들러 (기존 로직 유지)
     const handleCurrentLocation = () => {
@@ -205,16 +207,14 @@ const handleDeleteRecent = async (historyId, e) => {
         setError(null);
         setSearchResult(null);
 
-        // 🚨 [추가됨] 검색 시 서버에 최근 목적지 저장
-        if (endLocation.trim() && userUid) {
+        // 검색 기록 저장
+        if (endLocation && endLocation.trim() !== '' && userUid) {
             try {
                 await axios.post(`${API_BASE_URL}/api/history`, { 
-                    uid: userUid, 
-                    name: endLocation, 
-                    address: '최근 검색' 
+                    uid: userUid, name: endLocation, address: '최근 검색' 
                 });
-                fetchHistory(); // 목록 갱신
-            } catch (e) { console.error("히스토리 저장 실패"); }
+                setTimeout(fetchHistory, 300); 
+            } catch (e) {}
         }
 
         try {
@@ -224,11 +224,9 @@ const handleDeleteRecent = async (historyId, e) => {
                 const endCoords = await searchAddressToCoordinate(endLocation);
                 pathPoints = [startCoords, endCoords];
             } catch (geoError) {
-                console.warn("지도 API 실패:", geoError);
-                alert(`⚠️ ${geoError.message}\n(가상 경로로 대체합니다)`);
-                pathPoints = DUMMY_PATH;
-                if (!startLocation) setStartLocation('서울 시청');
-                if (!endLocation) setEndLocation('강남역');
+                toast.error(geoError.message);
+                setLoading(false);
+                return; 
             }
             
             setCalculatedPath(pathPoints);

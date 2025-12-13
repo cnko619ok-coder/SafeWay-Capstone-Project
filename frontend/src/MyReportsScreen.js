@@ -19,7 +19,7 @@ export default function MyReportsScreen({ userUid }) {
         if (!userUid) return;
         try {
             // 서버에 "내 UID로 쓴 글만 줘!" 요청
-            const response = await axios.get(`${API_BASE_URL}/api/reports/user/${userUid}`);
+            const response = await axios.get(`${API_BASE_URL}/api/reports/my/${userUid}`);
             setMyReports(response.data);
         } catch (error) {
             console.error("내역 로드 실패:", error);
