@@ -45,21 +45,31 @@ export default function MainScreen({ userUid }) {
         fetchData();
     }, [userUid]);
 
-    // 3. SOS 핸들러
+    // 3. 홈 화면 SOS 핸들러 (다중 발송 기능 적용)
     const handleHomeSOS = () => {
         if (!myPos) return toast.error("위치 정보를 가져오는 중입니다...");
 
+        // 1. 연락처가 없으면 112 제안
         if (contacts.length === 0) {
-            if(window.confirm("비상연락처가 없습니다. 112로 연결하시겠습니까?")) {
+            if(window.confirm("등록된 비상연락처가 없습니다.\n112로 연결하시겠습니까?")) {
                 window.location.href = 'tel:112';
             }
             return;
         }
 
+        // 2. 연락처가 있으면 다중 발송
+        // 🚨 모든 보호자의 전화번호를 쉼표로 연결
         const phoneNumbers = contacts.map(c => c.phone).join(',');
-        const message = `[SafeWay 긴급] 도와주세요! 위치: https://map.kakao.com/link/map/${myPos.lat},${myPos.lng}`;
-        const smsLink = `sms:${phoneNumbers}${navigator.userAgent.match(/iPhone/i) ? '&' : '?'}body=${encodeURIComponent(message)}`;
+        
+        const message = `[SafeWay 긴급] 도와주세요! 현재 위험한 상황입니다.\n위치: https://map.kakao.com/link/map/${myPos.lat},${myPos.lng}`;
+        
+        // 아이폰/안드로이드 호환성 처리
+        const separator = navigator.userAgent.match(/iPhone|iPad/i) ? '&' : '?';
+        const smsLink = `sms:${phoneNumbers}${separator}body=${encodeURIComponent(message)}`;
+        
         window.location.href = smsLink;
+        
+        toast.success(`${contacts.length}명의 보호자에게 메시지 창을 엽니다.`);
     };
 
     return (
