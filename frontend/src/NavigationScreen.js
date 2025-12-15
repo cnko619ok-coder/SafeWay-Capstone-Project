@@ -133,22 +133,31 @@ export default function NavigationScreen({ userUid }) {
         };
     }, [path, map, routeInfo, navigate]);
 
-    // 🚨 SOS 버튼 핸들러 (연락처 연동 추가됨)
+    // 🚨 SOS 버튼 핸들러 (다중 발송 기능 적용)
     let sosTimer;
     const startSOS = () => {
         setIsSOSPressed(true);
         sosTimer = setTimeout(() => {
-            // 1. 연락처가 없으면 112
+            
+            // 1. 연락처가 아예 없으면 -> 112로 연결 (비상책)
             if (contacts.length === 0) {
-                toast.error("연락처 없음. 112 연결창을 엽니다.");
+                toast.error("등록된 연락처가 없어 112 연결창을 엽니다.");
                 window.location.href = 'tel:112';
-            } else {
-                // 2. 연락처가 있으면 문자 발송
+            } 
+            // 2. 연락처가 있으면 -> 보호자 전원에게 단체 문자 발송
+            else {
+                // 🚨 전화번호를 쉼표(,)로 연결하여 다중 수신자 설정
+                // 예: "01012345678,01098765432"
                 const phoneNumbers = contacts.map(c => c.phone).join(',');
-                const message = `[SafeWay 긴급] SOS! 도와주세요! 현재위치: https://map.kakao.com/link/map/${currentPos?.lat},${currentPos?.lng}`;
-                // 아이폰/안드로이드 구분
-                const smsLink = `sms:${phoneNumbers}${navigator.userAgent.match(/iPhone/i) ? '&' : '?'}body=${encodeURIComponent(message)}`;
+                
+                const message = `[SafeWay 긴급] SOS! 도와주세요! 현재 제가 위험합니다.\n위치: https://map.kakao.com/link/map/${currentPos?.lat},${currentPos?.lng}`;
+                
+                // 아이폰(&)과 안드로이드(?)의 구분자 처리 (호환성 강화)
+                const separator = navigator.userAgent.match(/iPhone|iPad/i) ? '&' : '?';
+                const smsLink = `sms:${phoneNumbers}${separator}body=${encodeURIComponent(message)}`;
+                
                 window.location.href = smsLink;
+                
                 toast.success(`보호자 ${contacts.length}명에게 문자를 보냅니다.`);
             }
             setIsSOSPressed(false);
