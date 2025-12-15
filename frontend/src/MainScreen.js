@@ -1,8 +1,8 @@
 // frontend/src/MainScreen.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate, Link } from 'react-router-dom'; // useNavigate 추가
+import { useNavigate, Link } from 'react-router-dom';
 import { Shield, Users, AlertTriangle, Map as MapIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -13,6 +13,10 @@ export default function MainScreen({ userUid }) {
     const [stats, setStats] = useState({ safeReturnCount: 0, reportCount: 0 });
     const [contacts, setContacts] = useState([]);
     const [myPos, setMyPos] = useState(null);
+    
+    // 🚨 SOS 버튼 상태 관리 (누르고 있는지 확인용)
+    const [isSOSPressed, setIsSOSPressed] = useState(false);
+    const timerRef = useRef(null); // 타이머 저장용
 
     // 1. 내 위치 확보
     useEffect(() => {
@@ -23,19 +27,17 @@ export default function MainScreen({ userUid }) {
         );
     }, []);
 
-    // 2. 데이터 불러오기 (통계 + 연락처)
+    // 2. 데이터 불러오기
     useEffect(() => {
         const fetchData = async () => {
             if (!userUid) return;
             try {
-                // 통계
                 const userRes = await axios.get(`${API_BASE_URL}/api/users/${userUid}`);
                 setStats({
                     safeReturnCount: userRes.data.stats?.safeReturnCount || 0,
                     reportCount: userRes.data.stats?.reportCount || 0
                 });
 
-                // 연락처
                 const contactRes = await axios.get(`${API_BASE_URL}/api/contacts/${userUid}`);
                 setContacts(contactRes.data);
             } catch (error) {
@@ -45,11 +47,33 @@ export default function MainScreen({ userUid }) {
         fetchData();
     }, [userUid]);
 
-    // 3. 홈 화면 SOS 핸들러 (다중 발송 기능 적용)
-    const handleHomeSOS = () => {
-        if (!myPos) return toast.error("위치 정보를 가져오는 중입니다...");
+    // 🚨 3. SOS 꾹 누르기 로직 (핵심 수정)
+    const startSOS = () => {
+        if (!myPos) {
+            toast.error("위치 정보를 가져오는 중입니다...");
+            return;
+        }
 
-        // 1. 연락처가 없으면 112 제안
+        setIsSOSPressed(true); // 버튼 모양 변경 (눌림 효과)
+
+        // 2초 타이머 시작
+        timerRef.current = setTimeout(() => {
+            triggerSOSAction(); // 2초 뒤 실행
+            setIsSOSPressed(false); // 버튼 복구
+        }, 2000);
+    };
+
+    const endSOS = () => {
+        // 2초 전에 손을 떼면 취소
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            setIsSOSPressed(false);
+        }
+    };
+
+    // 4. 실제 문자 발송 함수
+    const triggerSOSAction = () => {
+        // 연락처가 없으면 112
         if (contacts.length === 0) {
             if(window.confirm("등록된 비상연락처가 없습니다.\n112로 연결하시겠습니까?")) {
                 window.location.href = 'tel:112';
@@ -57,19 +81,17 @@ export default function MainScreen({ userUid }) {
             return;
         }
 
-        // 2. 연락처가 있으면 다중 발송
-        // 🚨 모든 보호자의 전화번호를 쉼표로 연결
+        // 연락처가 있으면 문자 발송
         const phoneNumbers = contacts.map(c => c.phone).join(',');
-        
         const message = `[SafeWay 긴급] 도와주세요! 현재 위험한 상황입니다.\n위치: https://map.kakao.com/link/map/${myPos.lat},${myPos.lng}`;
         
-        // 아이폰/안드로이드 호환성 처리
         const separator = navigator.userAgent.match(/iPhone|iPad/i) ? '&' : '?';
         const smsLink = `sms:${phoneNumbers}${separator}body=${encodeURIComponent(message)}`;
         
         window.location.href = smsLink;
         
-        toast.success(`${contacts.length}명의 보호자에게 메시지 창을 엽니다.`);
+        // 🚨 요청하신 메시지 출력
+        toast.success(`보호자 ${contacts.length}명에게 메시지 앱을 엽니다.`);
     };
 
     return (
@@ -135,13 +157,29 @@ export default function MainScreen({ userUid }) {
                 </section>
             </main>
 
-            {/* 🚨 SOS 플로팅 버튼 (기능 연결됨) */}
-            <button 
-                onClick={handleHomeSOS}
-                className="fixed bottom-24 right-4 bg-red-500 text-white p-4 rounded-full shadow-lg shadow-red-300 hover:bg-red-600 hover:scale-105 transition-all z-40 flex items-center justify-center border-4 border-white animate-pulse"
-            >
-                <span className="font-black text-xs">SOS</span>
-            </button>
+            {/* 🚨 SOS 플로팅 버튼 (꾹 누르기 기능 적용) */}
+            <div className="fixed bottom-24 right-4 z-40">
+                <button 
+                    onMouseDown={startSOS} 
+                    onMouseUp={endSOS} 
+                    onMouseLeave={endSOS}
+                    onTouchStart={startSOS} 
+                    onTouchEnd={endSOS}
+                    className={`p-4 rounded-full shadow-lg border-4 border-white transition-all duration-200 flex items-center justify-center 
+                        ${isSOSPressed 
+                            ? 'bg-red-700 scale-95 ring-8 ring-red-200 shadow-xl' // 눌렸을 때 스타일
+                            : 'bg-red-500 hover:bg-red-600 hover:scale-105 shadow-red-300 animate-pulse' // 평소 스타일
+                        }`}
+                >
+                    <span className="font-black text-xs text-white">SOS</span>
+                </button>
+                {/* 누르고 있을 때 도움말 표시 */}
+                {isSOSPressed && (
+                    <div className="absolute -top-10 right-0 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                        2초간 누르세요...
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
