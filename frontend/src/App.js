@@ -142,6 +142,11 @@ function App() {
                   <Route 
                       path="/profile/account" 
                       element={isLoggedIn ? <AccountSettingsScreen /> : <Navigate to="/login" />} />
+
+                  <Route 
+                      path="/profile/history"  // 프로필 화면에서 이동하는 주소
+                      element={userUid ? <ReturnHistoryScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                  />
    
             </Routes>
             </div>

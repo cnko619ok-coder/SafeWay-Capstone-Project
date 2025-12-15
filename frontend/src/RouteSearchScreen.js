@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 // 🚨 ngrok 주소 확인
 const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
 
-// 로컬 환경 백업용 가상 경로 (기존 유지)
 const DUMMY_PATH = [
   { lat: 37.5668, lng: 126.9790 }, { lat: 37.5670, lng: 126.9792 }, { lat: 37.5672, lng: 126.9794 }, 
 ];
@@ -41,31 +40,25 @@ function RouteResultCard({ title, data, color, onClick, icon: Icon, isBest }) {
     );
 }
 
-// 🚨 userUid props 추가 (이게 있어야 개인화가 됩니다!)
 export default function RouteSearchScreen({ userUid }) {
     const [startLocation, setStartLocation] = useState('');
     const [endLocation, setEndLocation] = useState('');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
     const navigate = useNavigate(); 
     const [searchResult, setSearchResult] = useState(null);
     const [calculatedPath, setCalculatedPath] = useState([]);
 
-    // 🚨 [수정됨] 로컬 스토리지 제거 -> 빈 배열로 초기화
     const [favorites, setFavorites] = useState([]);
     const [recentDestinations, setRecentDestinations] = useState([]);
     const [isEditing, setIsEditing] = useState(false);
-    
-    // 🚨 [신규] 내 위치 저장용
     const [myPos, setMyPos] = useState(null);
 
-    // 🚨 1. 데이터 불러오기 및 초기화 (격리 강화)
+    // 1. 데이터 불러오기 (로그아웃 시 목록 비움 -> 공유 방지)
     useEffect(() => {
         if (userUid) {
             fetchFavorites();
             fetchHistory();
         } else {
-            // 🚨 로그아웃 상태면 목록을 즉시 비움 (공유 방지)
             setFavorites([]);
             setRecentDestinations([]);
         }
@@ -86,7 +79,6 @@ export default function RouteSearchScreen({ userUid }) {
         } catch (e) { console.error("히스토리 로드 실패", e); }
     };
 
-    // 🚨 [수정됨] 즐겨찾기 추가 (서버로 전송)
     const handleAddFavorite = async () => {
         if (!endLocation) return toast.error("도착지를 입력해주세요.");
         if (!userUid) return toast.error("로그인이 필요합니다.");
@@ -95,60 +87,61 @@ export default function RouteSearchScreen({ userUid }) {
         if (name) {
             try {
                 await axios.post(`${API_BASE_URL}/api/favorites`, { 
-                    uid: userUid, 
-                    name: name, 
-                    address: endLocation 
+                    uid: userUid, name: name, address: endLocation 
                 });
-                alert("즐겨찾기에 추가되었습니다.");
-                fetchFavorites(); // 목록 갱신
+                toast.success("즐겨찾기 추가됨");
+                fetchFavorites(); 
             } catch (e) { toast.error("추가 실패"); }
         }
     };
 
-    // 🚨 [수정됨] 즐겨찾기 삭제 (서버로 전송)
     const handleDeleteFavorite = async (id, e) => { 
         e.stopPropagation(); 
         if(window.confirm("삭제하시겠습니까?")) {
             try {
-                await axios.post(`${API_BASE_URL}/api/favorites/delete`, { 
-                    uid: userUid, 
-                    favoriteId: id 
-                });
+                await axios.post(`${API_BASE_URL}/api/favorites/delete`, { uid: userUid, favoriteId: id });
                 fetchFavorites();
             } catch (e) { toast.error("삭제 실패"); }
         }
     };
 
-    // 🚨🚨🚨 [수정됨] 삭제 로직 강화 (경로 파라미터 사용) 🚨🚨🚨
+    // 🚨 개별 삭제 (주소 파라미터 사용)
     const handleDeleteRecent = async (historyId, e) => {
         e.stopPropagation(); 
         if (!userUid) return;
 
-        // 화면에서 먼저 지워서 반응 속도 높임 (낙관적 업데이트)
+        // 화면에서 즉시 삭제 (낙관적 업데이트)
         setRecentDestinations(prev => prev.filter(item => item.id !== historyId));
 
         try {
-            // 바뀐 API 주소 사용: /api/history/:uid/:historyId
             await axios.delete(`${API_BASE_URL}/api/history/${userUid}/${historyId}`);
-            // 혹시 모르니 서버 데이터로 다시 동기화
-            fetchHistory();
         } catch (error) { 
             console.error("삭제 실패:", error);
-            fetchHistory(); // 실패하면 원래대로 복구
+            fetchHistory(); // 실패 시 복구
         }
     };
 
+    // 🚨 전체 삭제 함수 (수정됨)
     const handleDeleteAllRecent = async () => {
-        if (!window.confirm("기록을 모두 삭제하시겠습니까?")) return;
-        setRecentDestinations([]); // 즉시 비움
+        if (!window.confirm("검색 기록을 모두 삭제하시겠습니까?")) return;
+        
+        // 1. 화면 먼저 비우기 (반응 속도 UP)
+        setRecentDestinations([]);
+
         try {
+            // 2. 서버에 전체 삭제 요청 (아까 수정한 API 호출)
             await axios.delete(`${API_BASE_URL}/api/history/all/${userUid}`);
-        } catch (e) { toast.error("삭제 실패"); }
+            toast.success("전체 삭제 완료");
+        } catch (e) { 
+            console.error(e);
+            toast.error("삭제 실패");
+            // 실패하면 다시 목록 불러오기
+            fetchHistory();
+        }
     };
 
-    // 현위치 버튼 핸들러 (기존 로직 유지)
     const handleCurrentLocation = () => {
-        if (!navigator.geolocation) return alert("위치 정보 불가");
+        if (!navigator.geolocation) return toast.error("위치 권한이 필요합니다.");
         setLoading(true);
         navigator.geolocation.getCurrentPosition(
             (pos) => {
@@ -167,23 +160,21 @@ export default function RouteSearchScreen({ userUid }) {
                     setLoading(false);
                 }
             },
-            () => { alert("위치 파악 실패"); setLoading(false); },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            () => { toast.error("위치 파악 실패"); setLoading(false); },
+            { enableHighAccuracy: true }
         );
     };
 
-    // 장소 검색 함수 (기존 로직 유지)
     const searchAddressToCoordinate = (keyword) => {
         return new Promise((resolve, reject) => {
             if (!window.kakao || !window.kakao.maps || !window.kakao.maps.services) {
-                reject(new Error("카카오맵이 아직 로딩되지 않았습니다."));
+                reject(new Error("카카오맵 로딩 중..."));
                 return;
             }
             const ps = new window.kakao.maps.services.Places();
             const options = myPos ? {
                 location: new window.kakao.maps.LatLng(myPos.lat, myPos.lng),
-                //radius: 2000, 
-                sort: window.kakao.maps.services.SortBy.ACCURACY
+                sort: window.kakao.maps.services.SortBy.ACCURACY 
             } : {};
             
             ps.keywordSearch(keyword, (data, status) => {
@@ -200,11 +191,9 @@ export default function RouteSearchScreen({ userUid }) {
         });
     };
 
-    // 검색 핸들러 (기존 로직 유지 + 히스토리 저장 추가)
     const handleSearch = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError(null);
         setSearchResult(null);
 
         // 검색 기록 저장
@@ -241,7 +230,7 @@ export default function RouteSearchScreen({ userUid }) {
 
         } catch (err) { 
             console.error(err);
-            alert('경로 분석 실패: ' + err.message); 
+            toast.error('경로 분석 실패'); 
         } finally {
             setLoading(false);
         }
@@ -282,7 +271,6 @@ export default function RouteSearchScreen({ userUid }) {
 
                 {!searchResult ? (
                     <>
-                        {/* 즐겨찾기 목록 */}
                         <section>
                             <div className="flex items-center justify-between mb-3 px-1">
                                 <h3 className="text-sm font-bold text-gray-700 flex items-center"><Star className="w-4 h-4 mr-1 text-yellow-500 fill-yellow-500" /> 즐겨찾기</h3>
@@ -298,43 +286,23 @@ export default function RouteSearchScreen({ userUid }) {
                                 ))}
                             </div>
                         </section>
-                        {/* 최근 목적지 */}
                         <section>
                             <div className="flex items-center justify-between mb-3 px-1">
                                 <h3 className="text-sm font-bold text-gray-700">최근 목적지</h3>
-                                {recentDestinations.length > 0 && <button type="button" onClick={() => setRecentDestinations([])} className="text-xs text-gray-400 hover:text-red-500">전체 삭제</button>}
+                                {recentDestinations.length > 0 && <button type="button" onClick={handleDeleteAllRecent} className="text-xs text-gray-400 hover:text-red-500">전체 삭제</button>}
                             </div>
                             <div className="space-y-3">
-    {recentDestinations.map((dest) => (
-        // 🚨 div로 감싸서 배치 (key는 idx 대신 고유 id 사용 권장)
-        <div key={dest.id} className="relative group">
-            
-            {/* 1. 본문 버튼 (누르면 도착지 설정) */}
-            <button 
-                type="button" 
-                onClick={() => setEndLocation(dest.name)} 
-                className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md flex items-center text-left pr-12" // pr-12로 오른쪽 여백 확보
-            >
-                <div className="bg-gray-50 p-3 rounded-xl text-gray-400">
-                    <MapIcon className="w-5 h-5" />
-                </div>
-                <div className="ml-4">
-                    <p className="font-bold text-gray-800">{dest.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{dest.address || '최근 검색'}</p>
-                </div>
-            </button>
-
-            {/* 2. 🚨 삭제 버튼 (우측 상단 X 아이콘) */}
-            <button 
-                onClick={(e) => handleDeleteRecent(dest.id, e)} 
-                className="absolute top-1/2 right-4 transform -translate-y-1/2 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-10"
-                title="삭제"
-            >
-                <X className="w-4 h-4" />
-            </button>
-        </div>
-    ))}
-</div>
+                                {recentDestinations.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">최근 기록이 없습니다.</p> : 
+                                recentDestinations.map((dest) => (
+                                    <div key={dest.id} className="relative group">
+                                        <button type="button" onClick={() => setEndLocation(dest.name)} className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md flex items-center text-left pr-12">
+                                            <div className="bg-gray-50 p-3 rounded-xl text-gray-400"><MapIcon className="w-5 h-5" /></div>
+                                            <div className="ml-4 flex-1"><p className="font-bold text-gray-800">{dest.name}</p><p className="text-xs text-gray-400 mt-0.5">{dest.address || '최근 검색'}</p></div>
+                                        </button>
+                                        <button onClick={(e) => handleDeleteRecent(dest.id, e)} className="absolute top-1/2 right-4 transform -translate-y-1/2 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-10" title="삭제"><X className="w-4 h-4" /></button>
+                                    </div>
+                                ))}
+                            </div>
                         </section>
                     </>
                 ) : (

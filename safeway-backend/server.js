@@ -440,19 +440,27 @@ app.get('/api/reports/detail/:id', async (req, res) => {
 // =======================================================
 //           E. 사용자 프로필 API
 // =======================================================
+// E. 사용자 프로필 API
 app.get('/api/users/:uid', async (req, res) => {
     try {
         const userDoc = await db.collection('users').doc(req.params.uid).get();
         if (!userDoc.exists) return res.status(404).json({ error: '사용자 없음' });
         
-        const reportsSnapshot = await db.collection('reports').where('uid', '==', req.params.uid).get();
-        const historySnapshot = await db.collection('users').doc(req.params.uid).collection('history').get();
+        const userData = userDoc.data();
         
+        // 신고 횟수는 여전히 목록 개수로 셈 (필요시 이것도 분리 가능)
+        const reportsSnapshot = await db.collection('reports').where('uid', '==', req.params.uid).get();
+        
+        // 🚨 [수정됨] 이제 목록 개수(size) 대신 저장된 누적 횟수(totalSafeReturns)를 우선 사용함
+        // 만약 누적 횟수가 아직 없으면(기존 유저) 목록 개수로 대체
+        const historySnapshot = await db.collection('users').doc(req.params.uid).collection('history').get();
+        const safeCount = userData.totalSafeReturns || historySnapshot.size;
+
         res.json({ 
-            ...userDoc.data(),
+            ...userData,
             stats: {
                 reportCount: reportsSnapshot.size,
-                safeReturnCount: historySnapshot.size,
+                safeReturnCount: safeCount, // 👈 여기가 핵심!
                 usageTime: '12시간'
             }
         });
@@ -502,67 +510,94 @@ app.post('/api/favorites/delete', requireAuth, async (req, res) => {
 // ========================================================
 // 🚨 [수정] 최근 목적지 API (사용자별 격리 저장)
 // ========================================================
-// 1. 최근 목적지 저장 (내 방에만 저장)
+// 1. 귀가 기록 저장 (출발지/목적지 포함)
 app.post('/api/history', requireAuth, async (req, res) => {
     try {
-        const { uid, name } = req.body;
-        // 중복 저장 방지 (똑같은 장소면 기존 거 지우고 새로 등록 - 최신화)
-        const historyRef = db.collection('users').doc(uid).collection('history');
-        const snapshot = await historyRef.where('name', '==', name).get();
-        
-        if (!snapshot.empty) {
-            const batch = db.batch();
-            snapshot.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
+        // start: 출발지, end: 목적지, time: 소요시간, score: 안전점수
+        const { uid, start, end, time, score } = req.body;
+
+        // 🚨 데이터 검증: 출발지나 목적지가 없으면 저장 안 함
+        if (!start || !end) {
+            return res.status(400).json({ error: "경로 정보가 부족합니다." });
         }
 
+        const historyRef = db.collection('users').doc(uid).collection('history');
+        
+        // 새 기록 저장
         await historyRef.add({
-            ...req.body,
+            start, 
+            end, 
+            time: time || '0분',
+            score: score || 0,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
-        res.status(201).json({ message: '성공' });
+
+        // 사용자 총 안전귀가 횟수 증가
+        await db.collection('users').doc(uid).set({
+            totalSafeReturns: admin.firestore.FieldValue.increment(1)
+        }, { merge: true });
+
+        res.status(201).json({ message: '기록 저장 성공' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. 내 기록만 가져오기
+// 2. 내 기록 가져오기
 app.get('/api/history/:uid', async (req, res) => {
     try {
         const snap = await db.collection('users').doc(req.params.uid)
             .collection('history')
             .orderBy('createdAt', 'desc')
-            .limit(10)
+            .limit(30)
             .get();
         
-        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const data = snap.docs.map(doc => {
+            const d = doc.data();
+            return { 
+                id: doc.id, 
+                ...d,
+                // 날짜 변환 안전장치
+                createdAt: d.createdAt ? d.createdAt.toDate() : new Date() 
+            };
+        });
         res.json(data);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 🚨 [핵심 수정] 개별 삭제 (주소 파라미터 방식 - 더 강력함)
+// 3. 개별 삭제
 app.delete('/api/history/:uid/:itemId', async (req, res) => {
     try {
         const { uid, itemId } = req.params;
         await db.collection('users').doc(uid).collection('history').doc(itemId).delete();
         res.json({ message: '삭제 성공' });
     } catch (e) {
-        console.error("삭제 실패:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// 4. 전체 삭제
+// 4. 전체 삭제 (확실한 반복 삭제 버전)
 app.delete('/api/history/all/:uid', async (req, res) => {
     try {
-        const ref = db.collection('users').doc(req.params.uid).collection('history');
-        const snap = await ref.get();
-        if (snap.empty) return res.json({ message: '빈 목록' });
+        const uid = req.params.uid;
+        console.log(`💥 전체 삭제 요청: User(${uid})`);
 
-        const batch = db.batch();
-        snap.docs.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
+        const collectionRef = db.collection('users').doc(uid).collection('history');
+        const snapshot = await collectionRef.get();
+        
+        if (snapshot.empty) {
+            return res.json({ message: '이미 비어있음' });
+        }
 
+        // 🚨 [수정] 배치(Batch) 대신 하나씩 확실하게 삭제 (가장 안전한 방법)
+        // Promise.all을 사용하여 병렬로 빠르게 삭제합니다.
+        const deletePromises = snapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deletePromises);
+
+        console.log(`✅ ${snapshot.size}개 문서 삭제 완료`);
         res.json({ message: '전체 삭제 완료' });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) { 
+        console.error("전체 삭제 실패:", e);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
 // =======================================================
@@ -651,6 +686,61 @@ app.post('/api/route/directions', async (req, res) => {
         res.json(routeData);
     } catch (error) {
         res.status(500).json({ error: "길찾기 실패" });
+    }
+});
+
+// 🚨🚨🚨 [신규] 8. 게시글 수정 API 🚨🚨🚨
+app.put('/api/reports/:id', async (req, res) => {
+    try {
+        const reportId = req.params.id;
+        const { uid, title, content, type } = req.body; // 수정할 내용
+
+        const reportRef = db.collection('reports').doc(reportId);
+        const doc = await reportRef.get();
+
+        if (!doc.exists) return res.status(404).json({ error: "게시글 없음" });
+        if (doc.data().uid !== uid) return res.status(403).json({ error: "수정 권한이 없습니다." });
+
+        // 업데이트 실행
+        await reportRef.update({
+            title, content, type,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        res.json({ message: "수정 성공" });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 🚨🚨🚨 [신규] 9. 댓글 삭제 API 🚨🚨🚨
+app.delete('/api/reports/:reportId/comments/:commentId', async (req, res) => {
+    try {
+        const { reportId, commentId } = req.params;
+        const { uid } = req.body; // 요청한 사람 ID
+
+        // 댓글 문서 가져오기
+        const commentRef = db.collection('reports').doc(reportId).collection('comments').doc(commentId);
+        const doc = await commentRef.get();
+
+        if (!doc.exists) return res.status(404).json({ error: "댓글이 없습니다." });
+        
+        // 🚨 본인 확인 (댓글 쓴 사람만 지울 수 있음)
+        if (doc.data().uid !== uid) {
+            return res.status(403).json({ error: "삭제 권한이 없습니다." });
+        }
+
+        // 삭제 실행
+        await commentRef.delete();
+
+        // 🚨 게시글의 댓글 숫자(comments)를 1 줄임
+        await db.collection('reports').doc(reportId).update({
+            comments: admin.firestore.FieldValue.increment(-1)
+        });
+
+        res.json({ message: "댓글 삭제 성공" });
+    } catch (e) {
+        console.error("댓글 삭제 오류:", e);
+        res.status(500).json({ error: e.message });
     }
 });
 
