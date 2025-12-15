@@ -53,7 +53,6 @@ export default function RouteSearchScreen({ userUid }) {
     const [isEditing, setIsEditing] = useState(false);
     const [myPos, setMyPos] = useState(null);
 
-    // 1. 데이터 불러오기 (로그아웃 시 목록 비움 -> 공유 방지)
     useEffect(() => {
         if (userUid) {
             fetchFavorites();
@@ -71,10 +70,15 @@ export default function RouteSearchScreen({ userUid }) {
         } catch (e) { console.error("즐겨찾기 로드 실패", e); }
     };
 
+    // 🚨 [핵심 수정 1] 데이터를 불러올 때 'end(목적지)' 필드도 확인
     const fetchHistory = async () => {
         try {
             const res = await axios.get(`${API_BASE_URL}/api/history/${userUid}`);
-            const validData = res.data.filter(item => item.name && item.name.trim() !== '');
+            
+            // name이 있거나, end가 있는 데이터만 유효함
+            const validData = res.data.filter(item => 
+                (item.name && item.name.trim() !== '') || (item.end && item.end.trim() !== '')
+            );
             setRecentDestinations(validData);
         } catch (e) { console.error("히스토리 로드 실패", e); }
     };
@@ -105,39 +109,28 @@ export default function RouteSearchScreen({ userUid }) {
         }
     };
 
-    // 🚨 개별 삭제 (주소 파라미터 사용)
+    // 개별 삭제
     const handleDeleteRecent = async (historyId, e) => {
         e.stopPropagation(); 
         if (!userUid) return;
 
-        // 화면에서 즉시 삭제 (낙관적 업데이트)
         setRecentDestinations(prev => prev.filter(item => item.id !== historyId));
 
         try {
             await axios.delete(`${API_BASE_URL}/api/history/${userUid}/${historyId}`);
         } catch (error) { 
             console.error("삭제 실패:", error);
-            fetchHistory(); // 실패 시 복구
+            fetchHistory(); 
         }
     };
 
-    // 🚨 전체 삭제 함수 (수정됨)
+    // 전체 삭제
     const handleDeleteAllRecent = async () => {
         if (!window.confirm("검색 기록을 모두 삭제하시겠습니까?")) return;
-        
-        // 1. 화면 먼저 비우기 (반응 속도 UP)
         setRecentDestinations([]);
-
         try {
-            // 2. 서버에 전체 삭제 요청 (아까 수정한 API 호출)
             await axios.delete(`${API_BASE_URL}/api/history/all/${userUid}`);
-            toast.success("전체 삭제 완료");
-        } catch (e) { 
-            console.error(e);
-            toast.error("삭제 실패");
-            // 실패하면 다시 목록 불러오기
-            fetchHistory();
-        }
+        } catch (e) { toast.error("삭제 실패"); }
     };
 
     const handleCurrentLocation = () => {
@@ -196,14 +189,20 @@ export default function RouteSearchScreen({ userUid }) {
         setLoading(true);
         setSearchResult(null);
 
-        // 검색 기록 저장
-        if (endLocation && endLocation.trim() !== '' && userUid) {
+        // 🚨 [핵심 수정 2] 검색 시 저장도 'start', 'end' 포맷으로 맞춤
+        if (startLocation && endLocation && userUid) {
             try {
                 await axios.post(`${API_BASE_URL}/api/history`, { 
-                    uid: userUid, name: endLocation, address: '최근 검색' 
+                    uid: userUid, 
+                    start: startLocation,  // 출발지
+                    end: endLocation,      // 목적지
+                    time: '검색',          // 임시 표시
+                    score: 0 
                 });
-                setTimeout(fetchHistory, 300); 
-            } catch (e) {}
+                setTimeout(fetchHistory, 500); // 목록 갱신
+            } catch (e) {
+                console.error("기록 저장 실패", e);
+            }
         }
 
         try {
@@ -295,9 +294,13 @@ export default function RouteSearchScreen({ userUid }) {
                                 {recentDestinations.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">최근 기록이 없습니다.</p> : 
                                 recentDestinations.map((dest) => (
                                     <div key={dest.id} className="relative group">
-                                        <button type="button" onClick={() => setEndLocation(dest.name)} className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md flex items-center text-left pr-12">
+                                        {/* 🚨 [핵심 수정 3] item.end를 보여줌 (없으면 item.name) */}
+                                        <button type="button" onClick={() => setEndLocation(dest.end || dest.name)} className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md flex items-center text-left pr-12">
                                             <div className="bg-gray-50 p-3 rounded-xl text-gray-400"><MapIcon className="w-5 h-5" /></div>
-                                            <div className="ml-4 flex-1"><p className="font-bold text-gray-800">{dest.name}</p><p className="text-xs text-gray-400 mt-0.5">{dest.address || '최근 검색'}</p></div>
+                                            <div className="ml-4 flex-1">
+                                                <p className="font-bold text-gray-800">{dest.end || dest.name}</p>
+                                                <p className="text-xs text-gray-400 mt-0.5">{dest.start ? `출발: ${dest.start}` : (dest.address || '최근 검색')}</p>
+                                            </div>
                                         </button>
                                         <button onClick={(e) => handleDeleteRecent(dest.id, e)} className="absolute top-1/2 right-4 transform -translate-y-1/2 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-10" title="삭제"><X className="w-4 h-4" /></button>
                                     </div>
