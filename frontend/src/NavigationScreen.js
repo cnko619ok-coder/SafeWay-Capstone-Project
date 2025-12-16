@@ -43,10 +43,12 @@ export default function NavigationScreen({ userUid: propUserUid }) {
 
     const [isSheetOpen, setIsSheetOpen] = useState(true);
 
-    // 🚨🚨🚨 [절대 좌표 설정] 🚨🚨🚨
-    // 화면 크기 계산 안 함. 무조건 픽셀로 고정.
-    const SHEET_HEIGHT_PX = 340; // 시트 높이
-    const GAP_PX = 15;           // 시간창과 시트 사이 간격
+    // 🚨🚨🚨 [위치 상수 설정] 🚨🚨🚨
+    const SHEET_HEIGHT = 360; // 시트 높이
+    // 닫혔을 때 시간창이 떠있을 높이 (50px로 넉넉하게 띄움)
+    const CLOSED_BOTTOM = 50; 
+    // 열렸을 때 시간창이 떠있을 높이 (시트높이 + 20px)
+    const OPEN_BOTTOM = SHEET_HEIGHT + 20;
 
     // 1. 긴급 연락처 로드
     useEffect(() => {
@@ -175,14 +177,12 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </button>
             </div>
 
-            {/* 🚨🚨🚨 2. 시간 정보 카드 (상태에 따라 위치 점프) 🚨🚨🚨 */}
-            {/* z-50: 가장 위 / transition: 부드럽게 이동 */}
+            {/* 🚨🚨🚨 2. 시간 정보 카드 (플로팅) 🚨🚨🚨 */}
+            {/* 열렸을 땐 시트 위, 닫혔을 땐 바닥에서 50px 위 */}
             <div 
                 className="fixed left-4 right-4 z-50 transition-all duration-300 ease-in-out"
                 style={{ 
-                    // 열리면: 시트 높이(340) + 간격(15) = 355px (시트 바로 위)
-                    // 닫히면: 바닥에서 30px (절대 사라지지 않는 안전한 위치)
-                    bottom: isSheetOpen ? `${SHEET_HEIGHT_PX + GAP_PX}px` : '30px' 
+                    bottom: isSheetOpen ? `${OPEN_BOTTOM}px` : `${CLOSED_BOTTOM}px` 
                 }}
             >
                 <div 
@@ -209,27 +209,27 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </div>
             </div>
 
-            {/* 🚨🚨🚨 3. 하단 SOS 시트 (바닥에서 올라옴) 🚨🚨🚨 */}
-            {/* z-40: 시간창보다 아래 / bottom-0: 바닥에 고정 */}
+            {/* 🚨🚨🚨 3. 하단 SOS 시트 (안전 여백 확보) 🚨🚨🚨 */}
+            {/* 닫히면 화면 아래(120%)로 완전히 숨겨버립니다. */}
             <div 
                 className={`fixed left-0 right-0 bottom-0 z-40 bg-white rounded-t-[2.5rem] shadow-[0_-5px_30px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-in-out
-                ${isSheetOpen ? 'translate-y-0' : 'translate-y-full'}`} // 닫히면 화면 밖으로 완전히 숨김
-                style={{ height: `${SHEET_HEIGHT_PX}px` }} // 340px 고정
+                ${isSheetOpen ? 'translate-y-0' : 'translate-y-[120%]'}`} 
+                style={{ height: `${SHEET_HEIGHT}px` }}
             >
                 {/* 핸들 (닫기 버튼 역할) */}
                 <div 
                     onClick={() => setIsSheetOpen(false)}
-                    className="w-full h-[30px] flex items-center justify-center cursor-pointer active:bg-gray-50 rounded-t-[2.5rem]"
+                    className="w-full h-[30px] flex items-center justify-center cursor-pointer active:bg-gray-50 rounded-t-[2.5rem] absolute top-0 left-0 right-0 z-10"
                 >
                     <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
                 </div>
 
                 {/* 내용물 컨테이너 */}
-                {/* 🚨 핵심: padding-bottom을 넉넉히 주어 내용이 잘리지 않게 함 */}
-                <div className="px-6 pb-8 flex flex-col justify-between h-[calc(100%-30px)]">
+                {/* 🚨 핵심: pb-14 (약 56px) 여백으로 버튼을 위로 띄워 올림 */}
+                <div className="pt-[30px] px-6 pb-14 flex flex-col justify-between h-full">
                     
-                    {/* 보호자 모니터링 (컴팩트) */}
-                    <div className="bg-blue-50/80 px-4 py-2 rounded-xl flex items-center justify-between border border-blue-100 mb-1">
+                    {/* 보호자 모니터링 */}
+                    <div className="bg-blue-50/80 px-4 py-3 rounded-xl flex items-center justify-between border border-blue-100 mb-2">
                         <div className="flex items-center text-xs font-bold text-gray-700">
                             <Eye className="w-3 h-3 mr-2 text-green-500 animate-pulse" /> 
                             안심 귀가 모니터링 중
@@ -247,7 +247,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                         </div>
                     </div>
 
-                    {/* SOS 버튼 (중앙) */}
+                    {/* SOS 버튼 */}
                     <div className="flex flex-col items-center justify-center relative flex-grow">
                         <button
                             onMouseDown={startSOS} 
@@ -272,9 +272,9 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                         <p className="text-[10px] text-gray-400 mt-2">위급 시 2초간 꾹</p>
                     </div>
 
-                    {/* 하단 버튼 2개 (바닥에서 띄움) */}
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                        <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-3 rounded-xl font-bold shadow-sm active:scale-95 transition-transform text-sm">
+                    {/* 하단 버튼 2개 (여백 덕분에 절대 안 잘림) */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-3.5 rounded-xl font-bold shadow-sm active:scale-95 transition-transform text-sm">
                             <Phone className="w-4 h-4 mr-2 text-gray-500" /> 112 신고
                         </a>
                         <button 
@@ -283,7 +283,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                                 toast.success("안전하게 도착했습니다!"); 
                                 navigate('/'); 
                             }}
-                            className="flex items-center justify-center bg-green-500 text-white py-3 rounded-xl font-bold shadow-md shadow-green-200 active:scale-95 transition-transform text-sm"
+                            className="flex items-center justify-center bg-green-500 text-white py-3.5 rounded-xl font-bold shadow-md shadow-green-200 active:scale-95 transition-transform text-sm"
                         >
                             <Check className="w-4 h-4 mr-2" /> 도착 완료
                         </button>
