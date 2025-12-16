@@ -6,7 +6,9 @@ import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk
 import { Phone, Check, AlertTriangle, Eye, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { API_BASE_URL } from './config';
+
+// 🚨 MainScreen.js와 똑같이 config에서 주소를 가져옵니다!
+import { API_BASE_URL } from './config'; 
 
 const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8'; 
 
@@ -23,7 +25,6 @@ const MARKER_IMGS = {
     }
 };
 
-// 🚨 함수 안에 '{ userUid }'가 꼭 있어야 합니다!
 export default function NavigationScreen({ userUid }) {
     const location = useLocation();
     const navigate = useNavigate();
@@ -43,29 +44,28 @@ export default function NavigationScreen({ userUid }) {
     const [isSOSPressed, setIsSOSPressed] = useState(false);
     const sosTimerRef = useRef(null);
 
-    // 긴급 연락처 상태
     const [contacts, setContacts] = useState([]);
     const watchId = useRef(null);
 
-    // 🚨 1. 긴급 연락처 불러오기 (로그 추가됨)
+    // 🚨 1. 긴급 연락처 불러오기 (MainScreen과 동일한 로직 + 디버깅 로그)
     useEffect(() => {
-        // userUid가 잘 들어왔는지 콘솔에 찍어봅니다.
-        console.log("📍 [NavigationScreen] 전달받은 userUid:", userUid);
+        // [디버깅] 주소와 UID가 제대로 들어왔는지 확인
+        console.log("🔍 [Navigation] API_BASE_URL 확인:", API_BASE_URL);
+        console.log("🔍 [Navigation] userUid 확인:", userUid);
 
         const fetchContacts = async () => {
-            if (!userUid) {
-                console.warn("⚠️ userUid가 없어서 연락처를 못 가져옵니다.");
-                return;
-            }
+            if (!userUid) return;
             try {
-                const url = `${API_BASE_URL}/api/contacts/${userUid}`;
-                console.log("🌐 연락처 요청 주소:", url); // 주소 확인용
-
-                const res = await axios.get(url);
+                // MainScreen과 똑같은 방식으로 요청
+                const res = await axios.get(`${API_BASE_URL}/api/contacts/${userUid}`);
                 setContacts(res.data);
-                console.log("✅ 불러온 연락처 개수:", res.data.length);
+                console.log("✅ [Navigation] 연락처 로드 성공:", res.data.length, "명");
             } catch (e) { 
-                console.error("❌ 연락처 로드 실패 (서버 주소를 확인하세요):", e); 
+                console.error("❌ [Navigation] 연락처 로드 실패:", e);
+                // API_BASE_URL이 undefined면 여기서 에러가 납니다.
+                if (!API_BASE_URL) {
+                    toast.error("설정 파일(config.js)에서 주소를 불러오지 못했습니다.");
+                }
             }
         };
         fetchContacts();
@@ -131,10 +131,9 @@ export default function NavigationScreen({ userUid }) {
     }, [path, map, routeInfo, navigate]);
 
 
-    // 🚨 SOS 버튼 로직 (연락처 체크 강화)
+    // 🚨 SOS 버튼 로직
     const startSOS = () => {
         setIsSOSPressed(true);
-
         sosTimerRef.current = setTimeout(() => {
             triggerSOSAction();
             setIsSOSPressed(false);
@@ -149,11 +148,11 @@ export default function NavigationScreen({ userUid }) {
     };
 
     const triggerSOSAction = () => {
-        // 로그를 찍어봅니다.
-        console.log("🚨 SOS 발동! 현재 연락처 목록:", contacts);
-
+        console.log("🚨 SOS 시도. 현재 연락처:", contacts);
+        
         if (contacts.length === 0) {
-            toast.error("연락처를 불러오지 못했습니다. (서버 연결 확인 필요)");
+            toast.error("연락처를 불러오지 못했습니다. 112로 연결합니다.");
+            window.location.href = 'tel:112';
             return;
         }
 
