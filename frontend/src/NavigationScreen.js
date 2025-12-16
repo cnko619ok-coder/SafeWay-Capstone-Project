@@ -32,28 +32,20 @@ export default function NavigationScreen({ userUid: propUserUid }) {
 
     const [map, setMap] = useState(null);
     const [currentPos, setCurrentPos] = useState(path ? path[0] : null); 
-    
     const [passedPath, setPassedPath] = useState([]);
     const [remainPath, setRemainPath] = useState(path || []);
-    
     const [remainingTimeStr, setRemainingTimeStr] = useState(routeInfo?.time || "계산중");
     const [arrivalTimeStr, setArrivalTimeStr] = useState("");
-    
     const [isSOSPressed, setIsSOSPressed] = useState(false);
     const sosTimerRef = useRef(null);
-
     const [contacts, setContacts] = useState([]);
     const watchId = useRef(null);
     const [debugMsg, setDebugMsg] = useState("");
 
-    // 시트 열림/닫힘 상태
+    // 시트 상태
     const [isSheetOpen, setIsSheetOpen] = useState(true);
 
-    // 🚨🚨🚨 [수정됨] 시트 높이 설정 (넉넉하게 잡음) 🚨🚨🚨
-    const SHEET_HEIGHT = 520; // 전체 높이 (버튼 안 잘리게 넉넉히)
-    const HANDLE_HEIGHT = 50; // 닫혔을 때 남겨둘 손잡이 높이
-
-    // 1. 긴급 연락처 불러오기
+    // 1. 긴급 연락처 로드
     useEffect(() => {
         const fetchContacts = async () => {
             if (!userUid) return;
@@ -103,9 +95,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
 
                 const remainingRatio = Math.max(0, (path.length - minIdx) / path.length);
                 const leftMin = Math.ceil(minutes * remainingRatio);
-                const newRemainingTimeStr = leftMin > 0 ? `${leftMin}분` : "곧 도착";
-                
-                setRemainingTimeStr(newRemainingTimeStr);
+                setRemainingTimeStr(leftMin > 0 ? `${leftMin}분` : "곧 도착");
 
                 const endPos = path[path.length - 1];
                 if (getDistance(newLat, newLng, endPos.lat, endPos.lng) < 30) {
@@ -122,6 +112,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
         };
     }, [path, map, routeInfo, navigate]);
 
+    // SOS 관련
     const startSOS = () => {
         setIsSOSPressed(true);
         sosTimerRef.current = setTimeout(() => {
@@ -152,6 +143,10 @@ export default function NavigationScreen({ userUid: propUserUid }) {
 
     if (!path) return <div className="flex justify-center items-center h-screen">로딩중...</div>;
 
+    // 🚨 핵심 수정: 시트 높이를 고정값(500px)으로 잡되, 
+    // 닫힐 때 '100% - 70px' 만큼만 내려가도록 CSS 계산식(calc) 사용
+    const SHEET_HEIGHT = '550px'; 
+
     return (
         <div className="fixed inset-0 bg-gray-100 font-sans overflow-hidden">
             
@@ -180,12 +175,12 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </button>
             </div>
 
-            {/* 2. 시간 정보 카드 (동적 위치) */}
+            {/* 2. 시간 정보 카드 */}
             <div 
                 className="absolute left-4 right-4 z-20 transition-all duration-300 ease-in-out"
                 style={{ 
-                    // 🚨 열렸을 땐 시트 위(530px), 닫혔을 땐 핸들 위(70px)
-                    bottom: isSheetOpen ? `${SHEET_HEIGHT + 10}px` : `${HANDLE_HEIGHT + 20}px` 
+                    // 시트가 열리면 위로(560px), 닫히면 바닥에서 90px 위로 (손잡이 안 가리게)
+                    bottom: isSheetOpen ? '570px' : '90px' 
                 }}
             >
                 <div className="bg-white rounded-3xl shadow-xl p-5 flex items-center justify-between border border-gray-100">
@@ -211,24 +206,24 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 className="fixed left-0 right-0 z-30 bg-white rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-in-out"
                 style={{ 
                     bottom: 0,
-                    height: `${SHEET_HEIGHT}px`,
-                    // 🚨 핵심: 닫혔을 때 HANDLE_HEIGHT 만큼만 남기고 내려감
-                    transform: isSheetOpen ? 'translateY(0)' : `translateY(${SHEET_HEIGHT - HANDLE_HEIGHT}px)`
+                    height: SHEET_HEIGHT,
+                    // 🚨 열리면 0, 닫히면 전체 높이에서 70px(손잡이)만 빼고 다 내려감
+                    transform: isSheetOpen ? 'translateY(0)' : `translateY(calc(100% - 70px))`
                 }}
             >
-                {/* 핸들 (이 부분을 누르면 열리고 닫힘) */}
+                {/* 핸들 (터치 영역 확대) */}
                 <div 
                     onClick={() => setIsSheetOpen(!isSheetOpen)}
-                    className="w-full h-[50px] flex items-center justify-center cursor-pointer active:bg-gray-50 rounded-t-[2.5rem]"
+                    className="w-full h-[60px] flex items-center justify-center cursor-pointer active:bg-gray-50 rounded-t-[2.5rem]"
                 >
                     <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
                 </div>
 
-                {/* 시트 내용물 (flex-1로 공간 자동 분배) */}
-                <div className="px-6 pb-10 flex flex-col h-[470px] justify-between">
+                {/* 내용물 (스크롤 없이 꽉 차게, 하단 패딩 넉넉히) */}
+                <div className="px-6 flex flex-col justify-between h-[calc(100%-60px)] pb-12">
                     
                     {/* 보호자 모니터링 */}
-                    <div className="bg-blue-50/80 p-4 rounded-2xl flex items-center justify-between border border-blue-100 mt-2">
+                    <div className="bg-blue-50/80 p-4 rounded-2xl flex items-center justify-between border border-blue-100">
                         <div className="flex items-center text-sm font-bold text-gray-700">
                             <Eye className="w-4 h-4 mr-2 text-green-500 animate-pulse" /> 
                             안심 귀가 모니터링 중
@@ -246,8 +241,8 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                         </div>
                     </div>
 
-                    {/* SOS 버튼 (중앙 배치) */}
-                    <div className="flex flex-col items-center justify-center relative flex-grow">
+                    {/* SOS 버튼 */}
+                    <div className="flex flex-col items-center justify-center relative flex-grow py-4">
                         <button
                             onMouseDown={startSOS} 
                             onMouseUp={endSOS} 
@@ -260,19 +255,19 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                                     : 'bg-red-500 hover:bg-red-600 ring-4 ring-red-100 animate-pulse'}`}
                         >
                             <AlertTriangle className="w-10 h-10 mb-1" />
-                            <span className="text-2xl font-black tracking-widest">SOS</span>
+                            <span className="text-xl font-black tracking-widest">SOS</span>
                         </button>
                         
                         {isSOSPressed && (
-                            <div className="absolute top-4 right-4 bg-gray-800 text-white text-xs px-2 py-1 rounded animate-bounce">
+                            <div className="absolute top-0 right-4 bg-gray-800 text-white text-xs px-2 py-1 rounded animate-bounce">
                                 전송 중...
                             </div>
                         )}
                         <p className="text-[10px] text-gray-400 mt-4">위급 시 2초간 꾹 눌러주세요</p>
                     </div>
 
-                    {/* 하단 버튼 2개 (바닥에 붙어서 잘림 방지) */}
-                    <div className="grid grid-cols-2 gap-3 pb-4">
+                    {/* 하단 버튼 2개 (바닥에서 띄워서 잘림 방지) */}
+                    <div className="grid grid-cols-2 gap-3">
                         <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-4 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform">
                             <Phone className="w-5 h-5 mr-2 text-gray-500" /> 112 신고
                         </a>
