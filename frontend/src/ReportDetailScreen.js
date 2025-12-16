@@ -1,9 +1,6 @@
-// frontend/src/ReportDetailScreen.js
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-// 🚨 'X' 아이콘이 필요합니다.
 import { ArrowLeft, MapPin, Clock, ThumbsUp, MessageSquare, Send, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { API_BASE_URL } from './config';
@@ -64,12 +61,11 @@ export default function ReportDetailScreen({ userUid }) {
         } catch (e) { toast.error("댓글 등록 실패"); }
     };
 
-    // 🚨🚨🚨 [핵심] 댓글 삭제 함수 🚨🚨🚨
+    // 댓글 삭제 함수 
     const handleDeleteComment = async (commentId) => {
         if (!window.confirm("댓글을 삭제하시겠습니까?")) return;
         
         try {
-            // DELETE 요청 시 body에 데이터를 보내려면 data 속성을 써야 함
             await axios.delete(`${API_BASE_URL}/api/reports/${id}/comments/${commentId}`, {
                 data: { uid: userUid } 
             });
@@ -135,7 +131,7 @@ export default function ReportDetailScreen({ userUid }) {
                     </div>
                 </div>
 
-                {/* 🚨 댓글 목록 (수정됨) */}
+                {/* 댓글 목록 */}
                 <div className="space-y-3">
                     {comments.map((comment, idx) => (
                         <div key={idx} className="bg-white p-4 rounded-xl border shadow-sm relative group">
@@ -145,7 +141,7 @@ export default function ReportDetailScreen({ userUid }) {
                             </div>
                             <p className="text-gray-800 text-sm pr-6">{comment.content}</p>
                             
-                            {/* 🚨 내가 쓴 댓글일 때만 'X' 버튼 표시 */}
+                            {/* 내가 쓴 댓글일 때만 'X' 버튼 표시 */}
                             {comment.uid === userUid && (
                                 <button 
                                     onClick={() => handleDeleteComment(comment.id)}

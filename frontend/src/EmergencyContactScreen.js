@@ -1,5 +1,3 @@
-// frontend/src/EmergencyContactScreen.js
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -14,7 +12,7 @@ export default function EmergencyContactScreen({ userUid }) {
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
     
-    // 🚨 정렬 상태 ('latest': 최신순, 'name': 이름순)
+    // 정렬 상태 ('latest': 최신순, 'name': 이름순)
     const [sortType, setSortType] = useState('latest');
 
     const [newContact, setNewContact] = useState({ name: '', phone: '', relation: '' });
@@ -66,14 +64,13 @@ export default function EmergencyContactScreen({ userUid }) {
         }
     };
 
-    // 🚨🚨🚨 [핵심] 정렬 로직 함수 🚨🚨🚨
+    // 정렬 
     const getSortedContacts = () => {
-        const sorted = [...contacts]; // 원본 보호를 위해 복사
+        const sorted = [...contacts];
         
         if (sortType === 'latest') {
             // 최신순 (등록일 내림차순)
             sorted.sort((a, b) => {
-                // Firestore Timestamp 객체거나 문자열일 수 있으므로 처리
                 const dateA = a.createdAt ? new Date(a.createdAt.seconds ? a.createdAt.seconds * 1000 : a.createdAt) : new Date(0);
                 const dateB = b.createdAt ? new Date(b.createdAt.seconds ? b.createdAt.seconds * 1000 : b.createdAt) : new Date(0);
                 return dateB - dateA;
@@ -105,7 +102,7 @@ export default function EmergencyContactScreen({ userUid }) {
 
             <main className="p-5 pb-24">
                 
-                {/* 🚨 정렬 필터 버튼 */}
+                {/* 정렬 필터 버튼 */}
                 <div className="flex justify-end mb-4">
                     <div className="bg-white p-1 rounded-xl border border-gray-200 inline-flex shadow-sm">
                         <button 
@@ -133,7 +130,7 @@ export default function EmergencyContactScreen({ userUid }) {
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {/* 🚨 정렬된 리스트(getSortedContacts)를 맵핑 */}
+                        {/* 정렬된 리스트(getSortedContacts)를 맵핑 */}
                         {getSortedContacts().map((contact) => (
                             <div key={contact.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center group active:scale-[0.99] transition-transform">
                                 <div className="flex items-center">
@@ -160,7 +157,7 @@ export default function EmergencyContactScreen({ userUid }) {
                 )}
             </main>
 
-            {/* 🚨🚨🚨 [수정됨] 모달 위치 및 스타일 개선 🚨🚨🚨 */}
+            {/*  모달 위치 및 스타일 개선 */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm">
                     <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-scale-up relative">

@@ -1,5 +1,3 @@
-// frontend/src/NavigationScreen.js
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk';
@@ -43,12 +41,11 @@ export default function NavigationScreen({ userUid: propUserUid }) {
 
     const [isSheetOpen, setIsSheetOpen] = useState(true);
 
-    // 🚨 [설정값 유지] 🚨
     const SHEET_HEIGHT = 460; 
     const CLOSED_POS = 100;   
     const OPEN_POS = SHEET_HEIGHT + 15; 
 
-    // 1. 긴급 연락처 로드
+    //  긴급 연락처 로드
     useEffect(() => {
         const fetchContacts = async () => {
             if (!userUid) return;
@@ -60,7 +57,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
         fetchContacts();
     }, [userUid]);
 
-    // 2. 거리 계산 및 위치 추적
+    // 거리 계산 및 위치 추적
     useEffect(() => {
         if (!path || path.length < 2 || !navigator.geolocation) return;
 
@@ -174,7 +171,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </button>
             </div>
 
-            {/* 2. 시간 정보 카드 (세모 -> 선으로 변경) */}
+            {/* 시간 정보 카드 */}
             <div 
                 className="fixed left-4 right-4 z-50 transition-all duration-300 ease-in-out"
                 style={{ 
@@ -193,7 +190,6 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                         </p>
                     </div>
                     
-                    {/* 🚨 [수정] 화살표 대신 회색 세로선 추가 */}
                     <div className="h-10 w-[1px] bg-gray-200 mx-4"></div>
 
                     <div className="text-right">
@@ -205,7 +201,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </div>
             </div>
 
-            {/* 3. 하단 SOS 시트 */}
+            {/* 하단 SOS 시트 */}
             <div 
                 className={`fixed left-0 right-0 bottom-0 z-40 bg-white rounded-t-[2.5rem] shadow-[0_-5px_30px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-in-out
                 ${isSheetOpen ? 'translate-y-0' : 'translate-y-[120%]'}`} 

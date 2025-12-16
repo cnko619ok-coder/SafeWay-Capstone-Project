@@ -1,5 +1,3 @@
-// frontend/src/RouteResultScreen.js
-
 import React, { useState, useEffect } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -14,7 +12,7 @@ export default function RouteResultScreen({ userUid }) {
     const location = useLocation();
     const navigate = useNavigate();
     
-    // 1. 데이터 가져오기
+    // 데이터 가져오기
     const { routeData, searchData, pathPoints } = location.state || {};
     const [map, setMap] = useState(null);
     const [isSheetOpen, setIsSheetOpen] = useState(true);
@@ -22,12 +20,12 @@ export default function RouteResultScreen({ userUid }) {
     // 백엔드에서 받아온 진짜 경로(path)를 그대로 사용합니다.
     const { safety, shortest, balanced } = routeData;
 
-    // 1. 초기 경로 데이터 설정 (백엔드 데이터가 없을 때 대비)
+    // 초기 경로 데이터 설정 (백엔드 데이터가 없을 때 대비)
     const safePath = routeData?.safety?.path || [];
     const shortestPath = routeData?.shortest?.path || [];
     const balancedPath = routeData?.balanced?.path || [];
 
-    // 🚨 3. 지도 자동 줌 및 위치 보정 (수정됨: 중앙 정렬 & 하단 시트 고려)
+    // 지도 자동 줌 및 위치 보정
     useEffect(() => {
         if (map && (safePath.length > 0 || shortestPath.length > 0 || balancedPath.length > 0)) {
             const bounds = new window.kakao.maps.LatLngBounds();
@@ -41,11 +39,7 @@ export default function RouteResultScreen({ userUid }) {
             addPathToBounds(shortestPath);
             addPathToBounds(balancedPath);
 
-            // 🚨 패딩 설정 (상, 우, 하, 좌)
-            // 상: 80 (상단 여유)
-            // 우: 50 (우측 여유)
-            // 하: 200 (하단 시트가 올라와도 경로가 가려지지 않게 위로 띄움)
-            // 좌: 50 (기존 300에서 50으로 줄여서 중앙 정렬)
+           
             map.setBounds(bounds, 80, 50, 200, 50); 
         }
     }, [map, safePath, shortestPath, balancedPath]);
@@ -60,7 +54,7 @@ export default function RouteResultScreen({ userUid }) {
         );
     }
 
-   // 🚨🚨🚨 [핵심 수정] 선택한 경로의 '진짜 좌표'를 넘겨주는 함수 🚨🚨🚨
+   // 선택한 경로의 '좌표'를 넘겨주는 함수
     const handleStartNavigation = async (type) => {
         // 1. 선택한 타입에 맞는 데이터와 경로를 찾음
         let selectedRoute, selectedPath, typeName;
@@ -92,10 +86,10 @@ export default function RouteResultScreen({ userUid }) {
                 } catch (e) { console.error(e); }
             }
             
-            // 🚨 다음 화면으로 '선택된 경로(selectedPath)'를 보냄
+            // 다음 화면으로 '선택된 경로(selectedPath)'를 보냄
             navigate('/navigation', { 
                 state: { 
-                    path: selectedPath, // 👈 이게 일직선이 아닌 진짜 경로입니다!
+                    path: selectedPath, // 진짜 경로
                     routeInfo: selectedRoute, // 시간, 거리 정보
                     searchData: searchData    // 출발지, 도착지 이름
                 } 
@@ -103,7 +97,7 @@ export default function RouteResultScreen({ userUid }) {
         }
     };
 
-    // 그래프 계산용 숫자 파싱
+    // 그래프 계산용
     const parseNum = (str) => parseFloat(str?.replace(/[^0-9.]/g, '')) || 0;
     const maxDist = Math.max(parseNum(safety.distance), parseNum(shortest.distance), parseNum(balanced.distance));
     const maxTime = Math.max(parseNum(safety.time), parseNum(shortest.time), parseNum(balanced.time));
@@ -128,7 +122,7 @@ export default function RouteResultScreen({ userUid }) {
                    </Map>
             </div>
 
-            {/* 🚨🚨🚨 [추가됨] 경로 범례 (Legend) 🚨🚨🚨 */}
+            {/* 경로 범례 */}
             <div className="absolute top-16 right-4 bg-white/95 backdrop-blur p-3 rounded-xl shadow-lg z-10 text-xs font-bold text-gray-700 space-y-2 border border-gray-100">
                 <div className="flex items-center"><div className="w-8 h-1.5 bg-[#10b981] rounded mr-2"></div>안전 경로</div>
                 <div className="flex items-center"><div className="w-8 h-1.5 bg-[#f59e0b] rounded mr-2 border-b-2 border-white border-dashed"></div>최단 경로</div>
@@ -155,7 +149,7 @@ export default function RouteResultScreen({ userUid }) {
                     </div>
                 </div>
 
-                {/* 상세 내용 (스크롤 가능) */}
+                {/* 상세 내용 (스크롤) */}
                 <div className="flex-1 overflow-y-auto p-6 bg-gray-50 font-sans">
                     
                     {/* 그래프 비교 */}
@@ -173,11 +167,10 @@ export default function RouteResultScreen({ userUid }) {
                         <BarChart label="균형" value={balanced.time} max={maxTime} color="bg-yellow-400" />
                     </div>
 
-                    {/* 🚨🚨🚨 [수정됨] 점수 비교 카드 (깔끔한 스타일) 🚨🚨🚨 */}
+                    {/* 점수 비교 카드 */}
                     <div className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-3xl p-6 text-white shadow-lg mb-6 relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-full bg-white/10 opacity-30 transform rotate-12 scale-150"></div>
                         
-                        {/* 심플한 타이틀 (테두리 효과 제거, 크기 축소) */}
                         <div className="flex items-center mb-5 relative z-10 opacity-90">
                             <Shield className="w-5 h-5 mr-2 text-white"/>
                             <span className="text-xl font-bold text-white tracking-wide">
@@ -206,7 +199,7 @@ export default function RouteResultScreen({ userUid }) {
                             <div>항목</div><div className="text-green-600">안전</div><div className="text-orange-500">최단</div><div className="text-yellow-500">균형</div>
                         </div>
                         
-                        {/* 아이콘 옆에 텍스트가 항상 나오도록 수정됨 */}
+                        {/* 아이콘 옆에 텍스트가 항상 나오도록 */}
                         <ComparisonRow label="CCTV" icon={Camera} color="text-blue-500" v1={safety.cctv} v2={shortest.cctv} v3={balanced.cctv} />
                         <div className="border-t border-gray-50 my-2"></div>
                         <ComparisonRow label="가로등" icon={Lightbulb} color="text-yellow-500" v1={safety.lights} v2={shortest.lights} v3={balanced.lights} />
@@ -229,7 +222,7 @@ export default function RouteResultScreen({ userUid }) {
     );
 }
 
-// 📊 막대 그래프 컴포넌트
+// 막대 그래프 
 function BarChart({ label, value, max, color }) {
     const num = parseFloat(value?.replace(/[^0-9.]/g, '')) || 0;
     const width = max > 0 ? `${Math.max(15, (num / max) * 100)}%` : '15%';
@@ -244,7 +237,7 @@ function BarChart({ label, value, max, color }) {
     );
 }
 
-// 📋 상세 비교 행 컴포넌트 (텍스트 항상 표시)
+// 상세 비교 행 컴포넌트 
 function ComparisonRow({ label, icon: Icon, color, v1, v2, v3, isDanger }) {
     return (
         <div className="grid grid-cols-4 gap-2 text-center items-center py-2">

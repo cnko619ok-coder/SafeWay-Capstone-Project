@@ -1,5 +1,3 @@
-// frontend/src/ReturnHistoryScreen.js
-
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -124,7 +122,6 @@ export default function ReturnHistoryScreen({ userUid }) {
                                 <div className="flex-1">
                                     <div className="text-xs text-gray-400 mb-1">출발</div>
                                     <div className="font-bold text-gray-800 text-sm truncate">
-                                        {/* 예전 데이터는 start가 없을 수 있음 -> name으로 대체하거나 '알 수 없음' 표시 */}
                                         {item.start || item.name || '위치 정보 없음'}
                                     </div>
                                 </div>

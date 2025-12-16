@@ -1,10 +1,7 @@
-// frontend/src/App.js
-
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useKakaoLoader } from 'react-kakao-maps-sdk';
 import { Toaster } from 'sonner';
-
 import { AuthScreen } from './AuthScreen';
 import MainScreen from './MainScreen'; 
 import EmergencyContactScreen from './EmergencyContactScreen'; 
@@ -27,7 +24,7 @@ import SplashScreen from './SplashScreen';
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'any';
 
 function App() {
-    // 🚨 [수정 1] 시작할 때 저장된 UID가 있는지 확인 (새로고침 방지)
+    // 시작할 때 저장된 UID가 있는지 확인 (새로고침 방지)
     const savedUid = localStorage.getItem('userUid');
     
     const [isLoggedIn, setIsLoggedIn] = useState(!!savedUid); 
@@ -39,14 +36,14 @@ function App() {
       libraries: ["services", "clusterer", "drawing"], 
     });
 
-    // 🚨 [수정 2] 로그인 성공 시 저장소에 UID 저장
+    // 로그인 성공 시 저장소에 UID 저장
     const handleLoginSuccess = (uid) => {
         setUserUid(uid);
         setIsLoggedIn(true);
         localStorage.setItem('userUid', uid); // 영구 저장
     };
 
-    // 🚨 [추가] 로그아웃 기능 (필요시 사용)
+    // 로그아웃 기능 (필요시 사용)
     const handleLogout = () => {
         setUserUid(null);
         setIsLoggedIn(false);
@@ -126,7 +123,6 @@ function App() {
 
                       <Route 
                           path="/navigation" 
-                          // 🚨 userUid를 넘겨주지만, 혹시 몰라 NavigationScreen 내부에서도 처리함
                           element={isLoggedIn ? <NavigationScreen userUid={userUid} /> : <Navigate to="/login" />} 
                       />
 

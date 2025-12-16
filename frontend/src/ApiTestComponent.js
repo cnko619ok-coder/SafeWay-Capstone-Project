@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios'; 
 import { API_BASE_URL } from './config';
-// 이 코드를 실행하기 전에 반드시 'npm install axios'를 실행했는지 확인하세요.
-
 
 // 가상의 경로 좌표 데이터 (테스트용)
-// 이 데이터가 백엔드의 안전 점수 API로 전송됩니다.
 const DUMMY_PATH = [
   { lat: 37.5668, lng: 126.9790 }, // 지점 1
   { lat: 37.5669, lng: 126.9791 }, // 지점 2 (10미터 떨어진 곳)

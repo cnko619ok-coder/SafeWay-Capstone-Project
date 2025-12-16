@@ -1,7 +1,6 @@
-// frontend/src/AuthScreen.js
 import React, { useState } from 'react';
 import axios from 'axios'; 
-// 🚨 Firebase 관련 모듈 불러오기
+// Firebase 관련 모듈 불러오기
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { auth } from './firebase';
 import { Shield, Mail, Lock, User, ArrowRight } from 'lucide-react';
@@ -9,7 +8,6 @@ import { toast, Toaster } from 'sonner';
 import { API_BASE_URL } from './config';
 
 
-// 🚨 onLoginSuccess prop을 받도록 수정되었습니다.
 export function AuthScreen({ onLoginSuccess }) { 
   const [isLogin, setIsLogin] = useState(true); 
   const [formData, setFormData] = useState({
@@ -47,7 +45,7 @@ export function AuthScreen({ onLoginSuccess }) {
       if (isLogin) {
         setAuthStatus(`✅ 로그인 성공! (UID: ${response.data.uid})`);
         
-        // 🚨🚨🚨 로그인 성공 시 App.js에 UID를 전달하며 성공을 알림
+        // 로그인 성공 시 App.js에 UID를 전달하며 성공을 알림
         if (onLoginSuccess) {
           onLoginSuccess(response.data.uid); 
         }
@@ -58,17 +56,16 @@ export function AuthScreen({ onLoginSuccess }) {
       }
 
     } catch (error) {
-      // 🚨🚨🚨 [수정된 에러 처리 로직] 🚨🚨🚨
-      
-      // 1. 401 에러 (비밀번호 틀림/계정 없음)일 때 친절한 메시지 표시
+     
+      //  401 에러 (비밀번호 틀림/계정 없음)일 때 
       if (error.response && error.response.status === 401) {
         setAuthStatus('❌ 이메일 또는 비밀번호가 올바르지 않습니다.');
       } 
-      // 2. 그 외 서버에서 보낸 구체적인 에러 메시지가 있는 경우
+      // 그 외 서버에서 보낸 구체적인 에러 메시지가 있는 경우
       else if (error.response && error.response.data && error.response.data.error) {
         setAuthStatus(`❌ 오류: ${error.response.data.error}`);
       }
-      // 3. 그 외 알 수 없는 네트워크 오류 등
+      // 그 외 알 수 없는 네트워크 오류 등
       else {
         setAuthStatus('❌ 서버 연결에 실패했습니다. 다시 시도해 주세요.');
       }
@@ -77,7 +74,7 @@ export function AuthScreen({ onLoginSuccess }) {
     }
   };
 
-  // 🚨🚨🚨 [신규] 구글 로그인 함수 추가 🚨🚨🚨
+  // 구글 로그인 함수 
   const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
 
@@ -88,7 +85,7 @@ export function AuthScreen({ onLoginSuccess }) {
       
       console.log("구글 로그인 성공:", user);
 
-      // 🚨 [핵심] 백엔드에 소셜 사용자 정보 저장 요청 (비밀번호 없음!)
+      // 백엔드에 소셜 사용자 정보 저장 요청 (비밀번호 없음)
       try {
         await axios.post(`${API_BASE_URL}/api/auth/social`, {
           uid: user.uid,
@@ -198,10 +195,10 @@ export function AuthScreen({ onLoginSuccess }) {
                 </div>
               </div>
 
-              {/* 🚨🚨🚨 구글 로그인 버튼에 함수 연결 🚨🚨🚨 */}
+              {/* 구글 로그인 버튼에 함수 연결 */}
         <button
             type="button"
-            onClick={handleGoogleLogin} // 👈 여기 연결!
+            onClick={handleGoogleLogin} 
             className="w-full bg-white hover:bg-gray-50 text-gray-800 h-12 border border-gray-200 rounded-xl flex items-center justify-center transition-colors"
         >
             <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">

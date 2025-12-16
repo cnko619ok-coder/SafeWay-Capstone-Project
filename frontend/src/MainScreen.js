@@ -1,5 +1,3 @@
-// frontend/src/MainScreen.js
-
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +12,7 @@ export default function MainScreen({ userUid }) {
     const [contacts, setContacts] = useState([]);
     const [myPos, setMyPos] = useState(null);
     
-    // 🚨 SOS 모달 상태 관리
+    // SOS 모달 상태 관리
     const [showSOSModal, setShowSOSModal] = useState(false);
     const [progress, setProgress] = useState(0); // 게이지 (0~100)
     const [isSent, setIsSent] = useState(false); // 전송 완료 여부
@@ -50,7 +48,7 @@ export default function MainScreen({ userUid }) {
         fetchData();
     }, [userUid]);
 
-    // 🚨 3. SOS 게이지 로직 (핵심)
+    // SOS 게이지 
     const startHolding = () => {
         if (!myPos) {
             toast.error("위치 정보를 가져오는 중입니다...");
@@ -177,7 +175,7 @@ export default function MainScreen({ userUid }) {
                 </section>
             </main>
 
-            {/* 🚨 메인화면 SOS 플로팅 버튼 (누르면 모달 열림) */}
+            {/* 메인화면 SOS 플로팅 버튼 (누르면 모달 열림) */}
             <button 
                 onClick={() => setShowSOSModal(true)}
                 className="fixed bottom-24 right-4 bg-red-500 text-white p-4 rounded-full shadow-lg shadow-red-300 hover:bg-red-600 hover:scale-105 transition-all z-40 flex items-center justify-center border-4 border-white animate-pulse"
@@ -185,7 +183,7 @@ export default function MainScreen({ userUid }) {
                 <span className="font-black text-xs">SOS</span>
             </button>
 
-            {/* 🚨🚨🚨 SOS 전용 풀스크린 모달 🚨🚨🚨 */}
+            {/* SOS 전용 풀스크린 모달 */}
             {showSOSModal && (
                 <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-xl flex flex-col items-center justify-center animate-fade-in">
                     {/* 닫기 버튼 */}
@@ -202,7 +200,7 @@ export default function MainScreen({ userUid }) {
                         보호자 <span className="font-bold text-gray-800">{contacts.length}명</span>에게 문자가 전송됩니다.
                     </p>
 
-                    {/* 🔴 게이지 버튼 (SVG 애니메이션 적용) */}
+                    {/* 게이지 버튼 (SVG 애니메이션 적용) */}
                     <div className="relative mb-10">
                         {/* 배경 원 */}
                         <svg className="w-64 h-64 transform -rotate-90">

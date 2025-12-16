@@ -1,5 +1,3 @@
-// frontend/src/NotificationSettingsScreen.js
-
 import React, { useState } from 'react';
 import { ArrowLeft, Bell, Volume2, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';

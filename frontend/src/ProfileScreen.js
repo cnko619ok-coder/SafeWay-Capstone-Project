@@ -1,13 +1,9 @@
-// frontend/src/ProfileScreen.js
-
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { User, Settings, Bell, FileText, Clock, ChevronRight, LogOut, Shield, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from './config';
 
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
-
-// 🚨 onLogout을 props로 받습니다.
 export default function ProfileScreen({ userUid, onLogout }) {
     const navigate = useNavigate();
     
@@ -40,11 +36,9 @@ export default function ProfileScreen({ userUid, onLogout }) {
         fetchUser();
     }, [userUid]);
 
-    // 🚨 [수정됨] 로그아웃 핸들러
+    // 로그아웃 핸들러
     const handleLogout = () => {
         if (window.confirm('로그아웃 하시겠습니까?')) {
-            // 부모 컴포넌트(App.js)에서 전달받은 onLogout 함수 실행
-            // (localStorage를 비우고 상태를 초기화하는 역할)
             if (onLogout) {
                 onLogout();
             }

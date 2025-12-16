@@ -1,8 +1,6 @@
-// frontend/src/SplashScreen.js
-
 import React, { useEffect } from 'react';
 import { Shield, MapPin, Heart } from 'lucide-react';
-import { motion } from 'framer-motion'; // 🚨 motion/react -> framer-motion 으로 수정됨
+import { motion } from 'framer-motion'; 
 
 export default function SplashScreen({ onFinish }) {
   useEffect(() => {

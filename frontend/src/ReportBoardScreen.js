@@ -1,13 +1,11 @@
-// frontend/src/ReportBoardScreen.js
-
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
     ArrowLeft, Plus, MapPin, ThumbsUp, MessageSquare, X, 
-    Search, ArrowDownUp // 🚨 추가된 아이콘
+    Search, ArrowDownUp 
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner'; // 알림용 라이브러리 (없으면 alert 대체 가능)
+import { toast } from 'sonner';
 import { API_BASE_URL } from './config';
 
 
@@ -17,7 +15,7 @@ export default function ReportBoardScreen({ userUid }) {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // 🚨 [추가됨] 검색 및 정렬 상태
+    // 검색 및 정렬 상태
     const [searchTerm, setSearchTerm] = useState('');
     const [sortBy, setSortBy] = useState('latest'); // 'latest' | 'relevance'
 
@@ -28,7 +26,6 @@ export default function ReportBoardScreen({ userUid }) {
             setReports(response.data);
         } catch (error) {
             console.error("목록 로드 실패:", error);
-            // toast.error("목록을 불러오지 못했습니다."); 
         } finally {
             setLoading(false);
         }
@@ -39,7 +36,7 @@ export default function ReportBoardScreen({ userUid }) {
         fetchReports();
     }, []);
 
-    // 🚨🚨🚨 [핵심 추가] 검색 및 정렬 로직 함수 🚨🚨🚨
+    // 검색 및 정렬 로직 함수
     const getProcessedReports = () => {
         // 1. 검색어 필터링
         let filtered = reports.filter(report => {
@@ -92,7 +89,7 @@ export default function ReportBoardScreen({ userUid }) {
                     </div>
                 </div>
 
-                {/* 🚨 [추가됨] 검색창 및 정렬 버튼 영역 */}
+                {/* 검색창 및 정렬 버튼 영역 */}
                 <div className="px-4 pb-3">
                     <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -120,7 +117,7 @@ export default function ReportBoardScreen({ userUid }) {
                             </button>
                             <button 
                                 onClick={() => {
-                                    if(!searchTerm) alert('검색어를 먼저 입력해주세요'); // toast 대신 alert 사용 가능
+                                    if(!searchTerm) alert('검색어를 먼저 입력해주세요'); 
                                     else setSortBy('relevance');
                                 }}
                                 className={`px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${sortBy === 'relevance' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
@@ -142,11 +139,9 @@ export default function ReportBoardScreen({ userUid }) {
                         <p>{searchTerm ? "검색 결과가 없습니다." : "등록된 신고가 없습니다."}</p>
                     </div>
                 ) : (
-                    // 🚨 [수정됨] reports.map -> finalReports.map 으로 변경
                     finalReports.map((report) => (
                         <Link 
                             to={`/report-board/${report.id}`} 
-                            // state={{ report: report }} // 상세 페이지에서 다시 fetch하는 게 안전하므로 생략 가능 (선택)
                             key={report.id} 
                             className="block bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all active:scale-[0.98]"
                         >
@@ -207,7 +202,7 @@ export default function ReportBoardScreen({ userUid }) {
     );
 }
 
-// 🚨 신고 등록 모달 (기존 코드 그대로 유지)
+// 신고 등록 모달 
 function AddReportModal({ isOpen, onClose, onSuccess, userUid }) {
     const [formData, setFormData] = useState({ title: '', type: 'danger', content: '', location: '' });
 

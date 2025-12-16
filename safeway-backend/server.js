@@ -1,5 +1,3 @@
-// safeway-backend/server.js
-
 require('dotenv').config(); 
 
 const express = require('express');
@@ -11,10 +9,10 @@ const app = express();
 const port = process.env.PORT || 3005;
 
 // =======================================================
-// [0] 기본 설정 및 초기화
+// 기본 설정 및 초기화
 // =======================================================
 
-// 1. Firebase Admin SDK 초기화
+// Firebase Admin SDK 초기화
 const serviceAccount = require('./firebase-admin-key.json'); 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -23,14 +21,14 @@ admin.initializeApp({
 const db = admin.firestore();       
 const auth = admin.auth();         
 
-// 2. API 키 설정 (환경 변수 또는 직접 입력)
+// API 키 설정 (환경 변수 또는 직접 입력)
 const SEOUL_CCTV_KEY = process.env.SEOUL_CCTV_KEY;
 const CCTV_API_SERVICE = 'safeOpenCCTV'; 
 const SEOUL_CCTV_BASE_URL = 'http://openapi.seoul.go.kr:8088/';
 
 FIREBASE_WEB_API_KEY="AIzaSyCwSfI5yNqeosNX3Ve9W9AhpNc5Q6_AQPU"
 
-// 🚨 [필수] 카카오 REST API 키
+// 카카오 REST API 키
 const KAKAO_REST_API_KEY = "8b061f49c292c06e12c6e11814895014"; 
 
 app.use(cors({
@@ -47,7 +45,7 @@ app.use(express.json());
 
 // 가로등 데이터 캐싱 (일일 할당량 절약)
 let cachedStreetlights = []; 
-let cachedCCTVs = []; // 🚨 CCTV 저장소 추가
+let cachedCCTVs = []; // CCTV 저장소 추가
 
 async function loadInitialData() {
     // 1. 가로등 로드
@@ -82,7 +80,7 @@ async function getCCTVData() {
     } catch (error) { return []; }
 }
 
-// 🚨🚨🚨 [핵심 수정] 경로 분석 및 데이터 보정 함수 🚨🚨🚨
+// 경로 분석 및 데이터 보정 함수
 async function analyzePath(pathPoints) {
     const streetlights = cachedStreetlights; 
     const cctvData = await getCCTVData(); 
@@ -105,18 +103,16 @@ async function analyzePath(pathPoints) {
         totalCCTVs += cctvs;
     }
 
-    // 🚨 [데이터 보정] 0개일 경우 시뮬레이션 (데모용)
+    // 0개일 경우 시뮬레이션 (데모용)
     if (totalCCTVs === 0 && sampleCount > 0) totalCCTVs = Math.floor(sampleCount * 0.2); // 5번에 1번 꼴
     if (totalLights === 0 && sampleCount > 0) totalLights = Math.floor(sampleCount * 0.8); // 10번에 8번 꼴
 
-    // 🚨🚨🚨 [밀도 기반 점수 공식] 🚨🚨🚨
-    // 단순 합계가 아니라, "검사 지점당 평균 개수"를 봅니다.
-    
-    // 1. 평균 밀도 계산 (한 지점당 몇 개나 있는지)
+   
+    // 평균 밀도 계산 (한 지점당 몇 개나 있는지)
     const avgCCTVs = sampleCount > 0 ? (totalCCTVs / sampleCount) : 0;
     const avgLights = sampleCount > 0 ? (totalLights / sampleCount) : 0;
 
-    // 2. 점수 환산
+    // 점수 환산
     // - CCTV는 1개만 있어도(평균 0.5 이상) 아주 안전함 -> 가중치 40점
     // - 가로등은 평균 1.5개 이상이어야 밝음 -> 가중치 10점
     // - 기본 점수 50점 시작
@@ -126,16 +122,13 @@ async function analyzePath(pathPoints) {
     // 점수가 100점을 넘거나 너무 낮지 않게 조정
     score = Math.min(98, Math.max(40, Math.round(score)));
 
-    // (참고) 중복 제거된 총 개수를 반환 (화면 표시용)
-    // 화면에는 "총 100개" 처럼 보여주는 게 좋으므로 합계는 그대로 둠
-    // 다만 너무 많으면 조금 줄여서 보여줌
     const displayLights = Math.floor(totalLights / 3);
     const displayCCTVs = Math.floor(totalCCTVs / 3);
 
     return { score, lights: displayLights, cctv: displayCCTVs };
 }
 
-// 🚨 [누락되었던 함수 추가] 카카오 길찾기 요청 함수
+// 카카오 길찾기 요청 함수
 async function getKakaoRoute(start, end, priority, waypoints = []) {
     const url = "https://apis-navi.kakaomobility.com/v1/waypoints/directions";
     const requestBody = {
@@ -198,7 +191,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: '정보 누락' });
 
     try {
-        // 🚨 Firebase REST API로 비밀번호 진짜 검사
+        // Firebase REST API로 비밀번호 검사
         const loginUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_WEB_API_KEY}`;
         const response = await axios.post(loginUrl, { email, password, returnSecureToken: true });
 
@@ -214,8 +207,8 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// 🚨🚨🚨 3. [신규] 소셜 로그인 사용자 DB 저장 API 🚨🚨🚨
-// 구글 로그인 성공 후, 이 API를 호출해서 Firestore에 정보를 저장합니다.
+// 소셜 로그인 사용자 DB 저장 API 
+// 구글 로그인 성공 후, 이 API를 호출해서 Firestore에 정보를 저장
 app.post('/api/auth/social', async (req, res) => {
     const { uid, email, name } = req.body;
     try {
@@ -240,7 +233,7 @@ app.post('/api/auth/social', async (req, res) => {
 });
 
 // =======================================================
-//           B. 안전 경로 API (기본)
+//           B. 안전 경로 API 
 // =======================================================
 app.post('/api/route/safety', async (req, res) => {
     const { pathPoints } = req.body;
@@ -308,7 +301,7 @@ app.post('/api/reports', requireAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. 전체 신고 목록 조회
+// 전체 신고 목록 조회
 app.get('/api/reports', async (req, res) => {
     try {
         const snapshot = await db.collection('reports').orderBy('createdAt', 'desc').get();
@@ -320,11 +313,9 @@ app.get('/api/reports', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 3. 내 신고 목록 조회 (🚨 에러 해결: orderBy 제거하여 인덱스 문제 방지)
+// 내 신고 목록 조회 
 app.get('/api/reports/user/:uid', async (req, res) => {
     try {
-        // 🚨 주의: .where()와 .orderBy()를 같이 쓰려면 Firebase 콘솔에서 색인(Index)을 만들어야 합니다.
-        // 색인 에러를 피하기 위해 일단 orderBy를 뺐습니다. (필요하면 프론트에서 정렬)
         const snapshot = await db.collection('reports')
             .where('uid', '==', req.params.uid)
             .get();
@@ -334,7 +325,7 @@ app.get('/api/reports/user/:uid', async (req, res) => {
             createdAt: doc.data().createdAt ? doc.data().createdAt.toDate() : new Date()
         }));
         
-        // 자바스크립트로 최신순 정렬
+        // 최신순 정렬
         reports.sort((a, b) => b.createdAt - a.createdAt);
         
         res.status(200).json(reports);
@@ -344,7 +335,7 @@ app.get('/api/reports/user/:uid', async (req, res) => {
     }
 });
 
-// 4. 댓글 작성
+// 댓글 작성
 app.post('/api/reports/:id/comments', requireAuth, async (req, res) => {
     try {
         const { uid, content } = req.body;
@@ -366,7 +357,7 @@ app.post('/api/reports/:id/comments', requireAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 🚨🚨🚨 [신규 추가] 4-2. 댓글 목록 조회 (이게 없어서 안 보였던 것!) 🚨🚨🚨
+//  댓글 목록 조회
 app.get('/api/reports/:id/comments', async (req, res) => {
     try {
         const reportId = req.params.id;
@@ -379,7 +370,7 @@ app.get('/api/reports/:id/comments', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 5. 좋아요
+// 좋아요
 app.post('/api/reports/:id/like', requireAuth, async (req, res) => {
     try {
         const { uid } = req.body;
@@ -400,11 +391,11 @@ app.post('/api/reports/:id/like', requireAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 6. 게시글 삭제 (중복 제거하고 하나로 통합)
+// 게시글 삭제 (중복 제거하고 하나로 통합)
 app.delete('/api/reports/:id', async (req, res) => {
     try {
         const reportId = req.params.id;
-        const { uid } = req.body; // 프론트에서 data: { uid } 로 보냄
+        const { uid } = req.body;
 
         const docRef = db.collection('reports').doc(reportId);
         const doc = await docRef.get();
@@ -424,7 +415,7 @@ app.delete('/api/reports/:id', async (req, res) => {
     }
 });
 
-// 7. 상세 조회
+// 상세 조회
 app.get('/api/reports/detail/:id', async (req, res) => {
     try {
         const reportId = req.params.id;
@@ -440,7 +431,6 @@ app.get('/api/reports/detail/:id', async (req, res) => {
 // =======================================================
 //           E. 사용자 프로필 API
 // =======================================================
-// E. 사용자 프로필 API
 app.get('/api/users/:uid', async (req, res) => {
     try {
         const userDoc = await db.collection('users').doc(req.params.uid).get();
@@ -448,19 +438,16 @@ app.get('/api/users/:uid', async (req, res) => {
         
         const userData = userDoc.data();
         
-        // 신고 횟수는 여전히 목록 개수로 셈 (필요시 이것도 분리 가능)
         const reportsSnapshot = await db.collection('reports').where('uid', '==', req.params.uid).get();
         
-        // 🚨 [수정됨] 이제 목록 개수(size) 대신 저장된 누적 횟수(totalSafeReturns)를 우선 사용함
-        // 만약 누적 횟수가 아직 없으면(기존 유저) 목록 개수로 대체
-        const historySnapshot = await db.collection('users').doc(req.params.uid).collection('history').get();
+       const historySnapshot = await db.collection('users').doc(req.params.uid).collection('history').get();
         const safeCount = userData.totalSafeReturns || historySnapshot.size;
 
         res.json({ 
             ...userData,
             stats: {
                 reportCount: reportsSnapshot.size,
-                safeReturnCount: safeCount, // 👈 여기가 핵심!
+                safeReturnCount: safeCount, 
                 usageTime: '12시간'
             }
         });
@@ -483,7 +470,6 @@ app.put('/api/users/:uid', requireAuth, async (req, res) => {
 // =======================================================
 app.post('/api/favorites', requireAuth, async (req, res) => {
     try {
-        // users 컬렉션 -> 내 UID 문서 -> favorites 서브컬렉션에 저장
         await db.collection('users').doc(req.uid).collection('favorites').add({
             ...req.body,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
@@ -508,15 +494,15 @@ app.post('/api/favorites/delete', requireAuth, async (req, res) => {
 });
 
 // ========================================================
-// 🚨 [수정] 최근 목적지 API (사용자별 격리 저장)
+// 최근 목적지 API (사용자별 저장)
 // ========================================================
-// 1. 귀가 기록 저장 (출발지/목적지 포함)
+// 귀가 기록 저장 (출발지/목적지 포함)
 app.post('/api/history', requireAuth, async (req, res) => {
     try {
         // start: 출발지, end: 목적지, time: 소요시간, score: 안전점수
         const { uid, start, end, time, score } = req.body;
 
-        // 🚨 데이터 검증: 출발지나 목적지가 없으면 저장 안 함
+        // 데이터 검증: 출발지나 목적지가 없으면 저장 안 함
         if (!start || !end) {
             return res.status(400).json({ error: "경로 정보가 부족합니다." });
         }
@@ -541,7 +527,7 @@ app.post('/api/history', requireAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. 내 기록 가져오기
+// 내 기록 가져오기
 app.get('/api/history/:uid', async (req, res) => {
     try {
         const snap = await db.collection('users').doc(req.params.uid)
@@ -555,7 +541,6 @@ app.get('/api/history/:uid', async (req, res) => {
             return { 
                 id: doc.id, 
                 ...d,
-                // 날짜 변환 안전장치
                 createdAt: d.createdAt ? d.createdAt.toDate() : new Date() 
             };
         });
@@ -563,7 +548,7 @@ app.get('/api/history/:uid', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 3. 개별 삭제
+// 개별 삭제
 app.delete('/api/history/:uid/:itemId', async (req, res) => {
     try {
         const { uid, itemId } = req.params;
@@ -574,7 +559,7 @@ app.delete('/api/history/:uid/:itemId', async (req, res) => {
     }
 });
 
-// 4. 전체 삭제 (확실한 반복 삭제 버전)
+// 전체 삭제 
 app.delete('/api/history/all/:uid', async (req, res) => {
     try {
         const uid = req.params.uid;
@@ -587,9 +572,7 @@ app.delete('/api/history/all/:uid', async (req, res) => {
             return res.json({ message: '이미 비어있음' });
         }
 
-        // 🚨 [수정] 배치(Batch) 대신 하나씩 확실하게 삭제 (가장 안전한 방법)
-        // Promise.all을 사용하여 병렬로 빠르게 삭제합니다.
-        const deletePromises = snapshot.docs.map(doc => doc.ref.delete());
+       const deletePromises = snapshot.docs.map(doc => doc.ref.delete());
         await Promise.all(deletePromises);
 
         console.log(`✅ ${snapshot.size}개 문서 삭제 완료`);
@@ -610,7 +593,7 @@ app.post('/api/route/analyze', async (req, res) => {
     try {
         console.log(`🚀 경로 다양화 분석 시작`);
 
-        // 1. 중간 지점 계산 (경로를 비틀기 위해)
+        // 중간 지점 계산
         const midLat = (start.lat + end.lat) / 2;
         const midLng = (start.lng + end.lng) / 2;
 
@@ -645,11 +628,7 @@ app.post('/api/route/analyze', async (req, res) => {
             };
         }));
 
-        // 🚨🚨🚨 [수정 2] 점수 기반으로 역할 재배정 (Sorting) 🚨🚨🚨
-        // 1등: 점수가 가장 높은 경로 -> 'safety' (안전 경로)
-        // 2등: 거리가 가장 짧은 경로 -> 'shortest' (최단 경로)
-        // 3등: 나머지 하나 -> 'balanced' (균형 경로)
-
+       
         // 점수 내림차순 정렬
         const byScore = [...analyzedRoutes].sort((a, b) => b.score - a.score);
         const bestScoreRoute = byScore[0];
@@ -689,7 +668,7 @@ app.post('/api/route/directions', async (req, res) => {
     }
 });
 
-// 🚨🚨🚨 [신규] 8. 게시글 수정 API 🚨🚨🚨
+// 게시글 수정 API 
 app.put('/api/reports/:id', async (req, res) => {
     try {
         const reportId = req.params.id;
@@ -712,7 +691,7 @@ app.put('/api/reports/:id', async (req, res) => {
     }
 });
 
-// 🚨🚨🚨 [신규] 9. 댓글 삭제 API 🚨🚨🚨
+// 댓글 삭제 API
 app.delete('/api/reports/:reportId/comments/:commentId', async (req, res) => {
     try {
         const { reportId, commentId } = req.params;
@@ -724,7 +703,7 @@ app.delete('/api/reports/:reportId/comments/:commentId', async (req, res) => {
 
         if (!doc.exists) return res.status(404).json({ error: "댓글이 없습니다." });
         
-        // 🚨 본인 확인 (댓글 쓴 사람만 지울 수 있음)
+        // 본인 확인 (댓글 쓴 사람만 지울 수 있음)
         if (doc.data().uid !== uid) {
             return res.status(403).json({ error: "삭제 권한이 없습니다." });
         }
@@ -732,7 +711,7 @@ app.delete('/api/reports/:reportId/comments/:commentId', async (req, res) => {
         // 삭제 실행
         await commentRef.delete();
 
-        // 🚨 게시글의 댓글 숫자(comments)를 1 줄임
+        // 게시글의 댓글 숫자(comments)를 1 줄임
         await db.collection('reports').doc(reportId).update({
             comments: admin.firestore.FieldValue.increment(-1)
         });

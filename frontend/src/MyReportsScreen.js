@@ -1,5 +1,3 @@
-// frontend/src/MyReportsScreen.js
-
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
@@ -12,7 +10,7 @@ export default function MyReportsScreen({ userUid }) {
     const [myReports, setMyReports] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // 🚨 수정 모달 관련 상태
+    // 수정 모달 관련 상태
     const [isEditing, setIsEditing] = useState(false);
     const [editTarget, setEditTarget] = useState(null); // 수정할 글 객체
     const [editForm, setEditForm] = useState({ title: '', content: '', type: 'danger' });
@@ -44,14 +42,14 @@ export default function MyReportsScreen({ userUid }) {
         } catch (error) { toast.error("삭제 실패"); }
     };
 
-    // 🚨 수정 버튼 클릭 시 모달 열기
+    // 수정 버튼 클릭 시 모달 열기
     const openEditModal = (report) => {
         setEditTarget(report);
         setEditForm({ title: report.title, content: report.content, type: report.type });
         setIsEditing(true);
     };
 
-    // 🚨 수정 저장 함수
+    // 수정 저장 함수
     const handleUpdate = async () => {
         if (!editForm.title || !editForm.content) return toast.error("내용을 입력해주세요.");
         try {
@@ -103,7 +101,7 @@ export default function MyReportsScreen({ userUid }) {
                                 <div className="flex items-center text-xs text-gray-500"><MapPin className="w-3.5 h-3.5 mr-1" /> {report.location}</div>
                             </div>
 
-                            {/* 🚨 수정 & 삭제 버튼 그룹 */}
+                            {/* 수정 & 삭제 버튼 그룹 */}
                             <div className="absolute top-4 right-4 flex space-x-1">
                                 <button onClick={() => openEditModal(report)} className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-all">
                                     <Edit2 className="w-5 h-5" />
@@ -117,7 +115,7 @@ export default function MyReportsScreen({ userUid }) {
                 )}
             </main>
 
-            {/* 🚨 수정 모달 (팝업창) */}
+            {/* 수정 모달 (팝업창) */}
             {isEditing && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-5">
                     <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-fade-in-up">

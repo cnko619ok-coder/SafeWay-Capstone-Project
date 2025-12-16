@@ -1,10 +1,7 @@
-// frontend/src/AccountSettingsScreen.js
-
 import React from 'react';
 import { ArrowLeft, Lock, Trash2, LogOut } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom'; // useNavigate 추가
+import { Link, useNavigate } from 'react-router-dom';
 
-// 🚨 onLogout 파라미터 추가
 export default function AccountSettingsScreen({ onLogout }) {
     const navigate = useNavigate();
     
@@ -12,7 +9,7 @@ export default function AccountSettingsScreen({ onLogout }) {
         alert("가입하신 이메일로 비밀번호 재설정 링크를 보냈습니다.");
     };
 
-    // 🚨 [수정됨] 로그아웃 로직 (App.js와 연동)
+    // 로그아웃 (App.js와 연동)
     const handleLogout = () => {
         if(window.confirm('로그아웃 하시겠습니까?')) {
             if (onLogout) {
@@ -27,7 +24,7 @@ export default function AccountSettingsScreen({ onLogout }) {
         if (input === '삭제') {
             alert("계정이 삭제되었습니다.");
             
-            // 🚨 탈퇴 시에도 로그아웃 처리와 동일하게 저장소를 비워야 함
+            // 탈퇴 시에도 로그아웃 처리와 동일하게 저장소를 비우기
             if (onLogout) {
                 onLogout(); 
             }
@@ -61,7 +58,7 @@ export default function AccountSettingsScreen({ onLogout }) {
                         <h2 className="font-bold text-red-500">위험 구역</h2>
                     </div>
                     
-                    {/* 🚨 수정된 로그아웃 함수 연결 */}
+                    {/* 로그아웃 함수 연결 */}
                     <button onClick={handleLogout} className="w-full flex items-center justify-between p-4 hover:bg-red-50 transition-colors">
                         <div className="flex items-center space-x-3">
                             <div className="p-2 bg-gray-100 text-gray-600 rounded-lg"><LogOut className="w-5 h-5" /></div>

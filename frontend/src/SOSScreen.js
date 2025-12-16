@@ -1,20 +1,17 @@
-// frontend/src/SOSScreen.js
-
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios'; // 🚨 API 호출을 위해 추가
+import axios from 'axios'; 
 import { ArrowLeft, Phone, AlertTriangle, X, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API_BASE_URL } from './config';
 
-// 🚨 userUid를 props로 받아와야 합니다.
 export default function SOSScreen({ userUid }) {
     const [isPressing, setIsPressing] = useState(false);
     const [progress, setProgress] = useState(0);
     const [isActivated, setIsActivated] = useState(false);
     const [countdown, setCountdown] = useState(3);
     
-    // 🚨 내 비상연락처 목록 상태
+    // 내 비상연락처 목록 상태
     const [contacts, setContacts] = useState([]);
 
     // 내 위치 정보 상태
@@ -28,9 +25,9 @@ export default function SOSScreen({ userUid }) {
     const pressTimer = useRef(null);
     const countdownTimer = useRef(null);
 
-    // 🚨 1. 화면이 켜지면 내 위치 + 비상연락처를 가져옵니다.
+    // 화면이 켜지면 내 위치 + 비상연락처를 가져옴
     useEffect(() => {
-        // (1) 위치 가져오기
+        // 위치 가져오기
         if (!navigator.geolocation) {
             setLocationStatus('위치 정보 사용 불가');
         } else {
@@ -38,7 +35,7 @@ export default function SOSScreen({ userUid }) {
                 (position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
-                    // 구글 지도 링크 생성 (표준 포맷으로 수정)
+                    // 구글 지도 링크 생성
                     const link = `https://www.google.com/maps?q=${lat},${lng}`;
                     
                     setLocationInfo({ lat, lng, mapLink: link });
@@ -52,7 +49,7 @@ export default function SOSScreen({ userUid }) {
             );
         }
 
-        // (2) 비상연락처 목록 가져오기
+        // 비상연락처 목록 가져오기
         if (userUid) {
             fetchContacts();
         }
@@ -83,7 +80,7 @@ export default function SOSScreen({ userUid }) {
     };
 
     const sendSMS = () => {
-        // 🚨 예외 처리: 연락처가 없는 경우
+        // 예외 처리: 연락처가 없는 경우
         if (contacts.length === 0) {
             alert("등록된 비상연락처가 없습니다! [긴급 연락처] 메뉴에서 먼저 등록해주세요.");
             setIsActivated(false);
@@ -92,8 +89,7 @@ export default function SOSScreen({ userUid }) {
             return;
         }
 
-        // 🚨 3. 저장된 연락처들의 전화번호만 추출해서 쉼표로 연결
-        // 예: "01012345678,01098765432"
+        // 저장된 연락처들의 전화번호만 추출해서 쉼표로 연결
         const phoneNumbers = contacts.map(c => c.phoneNumber).join(',');
         
         // 확보된 위치 링크를 문자에 포함
@@ -103,7 +99,7 @@ export default function SOSScreen({ userUid }) {
             
         const message = `[SafeWay 긴급 알림] 🚨 지금 위험한 상황입니다! 도와주세요.\n${locationMsg}`;
         
-        // 🚨 OS별 문자 앱 링크 처리 (아이폰/안드로이드 호환성)
+        // OS별 문자 앱 링크 처리 (아이폰/안드로이드 호환성)
         const userAgent = navigator.userAgent.toLowerCase();
         let smsUrl = '';
 

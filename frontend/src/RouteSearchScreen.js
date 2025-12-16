@@ -1,5 +1,3 @@
-// frontend/src/RouteSearchScreen.js
-
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Search, MapPin, ArrowLeft, Clock, Map as MapIcon, Crosshair, Star, MinusCircle, Shield, Camera, Lightbulb, Scale, X } from 'lucide-react';
@@ -68,12 +66,10 @@ export default function RouteSearchScreen({ userUid }) {
         } catch (e) { console.error("즐겨찾기 로드 실패", e); }
     };
 
-    // 🚨 [핵심 수정 1] 데이터를 불러올 때 'end(목적지)' 필드도 확인
     const fetchHistory = async () => {
         try {
             const res = await axios.get(`${API_BASE_URL}/api/history/${userUid}`);
             
-            // name이 있거나, end가 있는 데이터만 유효함
             const validData = res.data.filter(item => 
                 (item.name && item.name.trim() !== '') || (item.end && item.end.trim() !== '')
             );
@@ -187,7 +183,6 @@ export default function RouteSearchScreen({ userUid }) {
         setLoading(true);
         setSearchResult(null);
 
-        // 🚨 [핵심 수정 2] 검색 시 저장도 'start', 'end' 포맷으로 맞춤
         if (startLocation && endLocation && userUid) {
             try {
                 await axios.post(`${API_BASE_URL}/api/history`, { 
@@ -292,7 +287,6 @@ export default function RouteSearchScreen({ userUid }) {
                                 {recentDestinations.length === 0 ? <p className="text-center text-gray-400 text-xs py-4">최근 기록이 없습니다.</p> : 
                                 recentDestinations.map((dest) => (
                                     <div key={dest.id} className="relative group">
-                                        {/* 🚨 [핵심 수정 3] item.end를 보여줌 (없으면 item.name) */}
                                         <button type="button" onClick={() => setEndLocation(dest.end || dest.name)} className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md flex items-center text-left pr-12">
                                             <div className="bg-gray-50 p-3 rounded-xl text-gray-400"><MapIcon className="w-5 h-5" /></div>
                                             <div className="ml-4 flex-1">

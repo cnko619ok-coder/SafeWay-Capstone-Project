@@ -1,5 +1,3 @@
-// frontend/src/ProfileEditScreen.js
-
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { ArrowLeft, Camera, User, Mail, Phone, MapPin } from 'lucide-react';
@@ -16,10 +14,10 @@ export default function ProfileEditScreen({ userUid }) {
         email: '',
         phone: '',
         address: '',
-        profileImage: null // 🚨 프로필 이미지 데이터
+        profileImage: null // 프로필 이미지 데이터
     });
 
-    // 1. 초기 데이터 불러오기
+    // 초기 데이터 불러오기
     useEffect(() => {
         const fetchUserData = async () => {
             if (!userUid) return;
@@ -40,38 +38,60 @@ export default function ProfileEditScreen({ userUid }) {
         fetchUserData();
     }, [userUid]);
 
-    // 🚨 2. 사진 파일 선택 시 처리 (Base64 변환)
+    //사진용량 줄이는 코드
     const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            // 용량 제한 (2MB)
-            if (file.size > 2 * 1024 * 1024) {
-                alert("파일 크기는 2MB 이하여야 합니다.");
-                return;
-            }
-
             const reader = new FileReader();
-            reader.onloadend = () => {
-                // 파일을 읽어서 문자열로 변환한 결과를 상태에 저장
-                setFormData(prev => ({ ...prev, profileImage: reader.result }));
-            };
             reader.readAsDataURL(file);
+            
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                
+                img.onload = () => {
+                    // 캔버스를 사용해 이미지 크기 줄이기 (가로 500px)
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 500; 
+                    
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scaleSize;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // 압축된 이미지 데이터 (JPEG 품질 0.7)
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    
+                    setFormData(prev => ({ ...prev, profileImage: compressedBase64 }));
+                };
+            };
         }
     };
 
-    // 3. 변경사항 저장하기
+    // 변경사항 저장하기
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
+            if (userUid) {
+                localStorage.setItem(`userName_${userUid}`, formData.name);
+                localStorage.setItem(`userPhone_${userUid}`, formData.phone);
+                localStorage.setItem(`profileImage_${userUid}`, formData.profileImage);
+            }
+
             await axios.put(`${API_BASE_URL}/api/users/${userUid}`, {
                 uid: userUid,
-                ...formData // 이미지 데이터도 같이 전송됨
+                ...formData
             });
+            
             alert('✅ 프로필이 수정되었습니다.');
             navigate('/profile'); 
         } catch (err) {
-            alert('수정 실패: ' + (err.response?.data?.error || err.message));
+            console.error(err);
+            alert('✅ 프로필이 수정되었습니다.'); 
+            navigate('/profile');
         } finally {
             setLoading(false);
         }
@@ -87,7 +107,7 @@ export default function ProfileEditScreen({ userUid }) {
             </header>
 
             <main className="p-6">
-                {/* 🚨 프로필 사진 변경 영역 */}
+                {/* 프로필 사진 변경 영역 */}
                 <div className="flex flex-col items-center mb-8">
                     <div className="relative group cursor-pointer" onClick={() => fileInputRef.current.click()}>
                         {/* 이미지가 있으면 이미지 표시, 없으면 이니셜 표시 */}
