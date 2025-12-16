@@ -7,7 +7,7 @@ import { Phone, Check, AlertTriangle, Eye, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
-// 🚨 MainScreen.js와 똑같이 config에서 주소를 가져옵니다!
+// 🚨 MainScreen.js와 동일한 설정 파일 사용
 import { API_BASE_URL } from './config'; 
 
 const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8'; 
@@ -47,25 +47,30 @@ export default function NavigationScreen({ userUid }) {
     const [contacts, setContacts] = useState([]);
     const watchId = useRef(null);
 
-    // 🚨 1. 긴급 연락처 불러오기 (MainScreen과 동일한 로직 + 디버깅 로그)
+    // 🚨 [진단용] 화면에 에러를 띄우기 위한 상태 변수
+    const [debugMsg, setDebugMsg] = useState("데이터 로딩 중...");
+
+    // 1. 긴급 연락처 불러오기
     useEffect(() => {
-        // [디버깅] 주소와 UID가 제대로 들어왔는지 확인
-        console.log("🔍 [Navigation] API_BASE_URL 확인:", API_BASE_URL);
-        console.log("🔍 [Navigation] userUid 확인:", userUid);
+        // 화면 진단 메시지 업데이트
+        setDebugMsg(`시작: UID=${userUid ? userUid.slice(0,5)+'...' : '없음'} / URL=${API_BASE_URL}`);
 
         const fetchContacts = async () => {
-            if (!userUid) return;
+            if (!userUid) {
+                setDebugMsg("❌ 오류: userUid가 없습니다. (로그인 풀림 의심)");
+                return;
+            }
             try {
-                // MainScreen과 똑같은 방식으로 요청
-                const res = await axios.get(`${API_BASE_URL}/api/contacts/${userUid}`);
+                const url = `${API_BASE_URL}/api/contacts/${userUid}`;
+                const res = await axios.get(url);
                 setContacts(res.data);
-                console.log("✅ [Navigation] 연락처 로드 성공:", res.data.length, "명");
+                
+                // 성공 메시지
+                setDebugMsg(`✅ 성공: 연락처 ${res.data.length}개 로드됨`);
             } catch (e) { 
-                console.error("❌ [Navigation] 연락처 로드 실패:", e);
-                // API_BASE_URL이 undefined면 여기서 에러가 납니다.
-                if (!API_BASE_URL) {
-                    toast.error("설정 파일(config.js)에서 주소를 불러오지 못했습니다.");
-                }
+                // 실패 메시지 (화면에 띄움)
+                setDebugMsg(`❌ 실패: ${e.message}`);
+                console.error(e);
             }
         };
         fetchContacts();
@@ -78,10 +83,10 @@ export default function NavigationScreen({ userUid }) {
         const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
         const Δφ = (lat2 - lat1) * Math.PI / 180, Δλ = (lng2 - lng1) * Math.PI / 180;
         const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     };
 
-    // 3. 위치 추적 및 경로 로직
+    // 3. 위치 추적 로직
     useEffect(() => {
         if (!path || path.length < 2 || !navigator.geolocation) return;
 
@@ -95,7 +100,6 @@ export default function NavigationScreen({ userUid }) {
                 const newLat = position.coords.latitude;
                 const newLng = position.coords.longitude;
                 const newPos = { lat: newLat, lng: newLng };
-
                 setCurrentPos(newPos);
                 
                 let minIdx = 0;
@@ -105,11 +109,8 @@ export default function NavigationScreen({ userUid }) {
                     if (d < minDist) { minDist = d; minIdx = i; }
                 });
 
-                const passed = path.slice(0, minIdx + 1);
-                setPassedPath(passed);
-
-                const remain = path.slice(minIdx);
-                setRemainPath(remain);
+                setPassedPath(path.slice(0, minIdx + 1));
+                setRemainPath(path.slice(minIdx));
 
                 const remainingRatio = Math.max(0, (path.length - minIdx) / path.length);
                 const leftMin = Math.ceil(totalMinutes * remainingRatio);
@@ -117,11 +118,11 @@ export default function NavigationScreen({ userUid }) {
 
                 const endPos = path[path.length - 1];
                 if (getDistance(newLat, newLng, endPos.lat, endPos.lng) < 30) {
-                    toast.success("목적지에 도착했습니다! 🎉");
+                    toast.success("도착 완료!");
                     navigator.geolocation.clearWatch(watchId.current);
                 }
             },
-            (err) => console.warn("GPS 대기중...", err),
+            (err) => console.warn(err),
             { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
         );
 
@@ -148,22 +149,21 @@ export default function NavigationScreen({ userUid }) {
     };
 
     const triggerSOSAction = () => {
-        console.log("🚨 SOS 시도. 현재 연락처:", contacts);
-        
         if (contacts.length === 0) {
-            toast.error("연락처를 불러오지 못했습니다. 112로 연결합니다.");
+            // 디버그 메시지 확인하라고 알림
+            toast.error("연락처 로드 실패. 상단 디버그 메시지를 확인하세요.");
+            // 🚨 비상시 112 연결 유지 (안전 제일)
             window.location.href = 'tel:112';
             return;
         }
 
         const phoneNumbers = contacts.map(c => c.phone).join(',');
-        const message = `[SafeWay 긴급] SOS! 도와주세요! 현재 경로 이동 중 위험 상황입니다.\n위치: https://map.kakao.com/link/map/${currentPos?.lat},${currentPos?.lng}`;
-        
+        const message = `[SafeWay] SOS! 도와주세요! 위치: https://map.kakao.com/link/map/${currentPos?.lat},${currentPos?.lng}`;
         const separator = navigator.userAgent.match(/iPhone|iPad/i) ? '&' : '?';
         const smsLink = `sms:${phoneNumbers}${separator}body=${encodeURIComponent(message)}`;
         
         window.location.href = smsLink;
-        toast.success(`보호자 ${contacts.length}명에게 메시지 앱을 엽니다.`);
+        toast.success(`보호자 ${contacts.length}명에게 연결합니다.`);
     };
 
     if (!path) return <div className="flex justify-center items-center h-screen">경로 데이터를 불러오는 중...</div>;
@@ -171,8 +171,13 @@ export default function NavigationScreen({ userUid }) {
     return (
         <div className="min-h-screen bg-white flex flex-col font-sans relative">
             
-            {/* 상단바 */}
-            <div className="absolute top-0 left-0 right-0 z-20 p-4 pt-12 pointer-events-none">
+            {/* 🚨🚨🚨 [진단용 패널] 화면 맨 위에 상태를 표시합니다 🚨🚨🚨 */}
+            <div className="absolute top-0 left-0 right-0 bg-black/80 text-yellow-300 p-2 text-[10px] z-50 break-all">
+                DEBUG: {debugMsg}
+            </div>
+
+            {/* 상단바 (DEBUG 패널 때문에 top-12로 조금 내림) */}
+            <div className="absolute top-8 left-0 right-0 z-20 p-4 pt-4 pointer-events-none">
                 <div className="flex items-center justify-between pointer-events-auto">
                     <button onClick={() => navigate(-1)} className="bg-white p-3 rounded-full shadow-lg text-gray-700 hover:bg-gray-50 transition active:scale-95">
                         <ArrowLeft className="w-6 h-6" />
