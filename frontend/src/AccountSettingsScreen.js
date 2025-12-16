@@ -2,19 +2,36 @@
 
 import React from 'react';
 import { ArrowLeft, Lock, Trash2, LogOut } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // useNavigate 추가
 
-export default function AccountSettingsScreen() {
+// 🚨 onLogout 파라미터 추가
+export default function AccountSettingsScreen({ onLogout }) {
+    const navigate = useNavigate();
     
     const handlePasswordReset = () => {
         alert("가입하신 이메일로 비밀번호 재설정 링크를 보냈습니다.");
     };
 
+    // 🚨 [수정됨] 로그아웃 로직 (App.js와 연동)
+    const handleLogout = () => {
+        if(window.confirm('로그아웃 하시겠습니까?')) {
+            if (onLogout) {
+                onLogout(); // 저장소 비우기
+            }
+            navigate('/login'); // 로그인 화면으로 이동
+        }
+    };
+
     const handleDeleteAccount = () => {
         const input = prompt("계정을 삭제하시겠습니까? '삭제'를 입력하면 진행됩니다.");
         if (input === '삭제') {
-            alert("계정이 삭제되었습니다. (기능 구현 예정)");
-            window.location.href = '/login';
+            alert("계정이 삭제되었습니다.");
+            
+            // 🚨 탈퇴 시에도 로그아웃 처리와 동일하게 저장소를 비워야 함
+            if (onLogout) {
+                onLogout(); 
+            }
+            navigate('/login');
         }
     };
 
@@ -44,7 +61,8 @@ export default function AccountSettingsScreen() {
                         <h2 className="font-bold text-red-500">위험 구역</h2>
                     </div>
                     
-                    <button onClick={() => { if(window.confirm('로그아웃 하시겠습니까?')) window.location.href='/login'; }} className="w-full flex items-center justify-between p-4 hover:bg-red-50 transition-colors">
+                    {/* 🚨 수정된 로그아웃 함수 연결 */}
+                    <button onClick={handleLogout} className="w-full flex items-center justify-between p-4 hover:bg-red-50 transition-colors">
                         <div className="flex items-center space-x-3">
                             <div className="p-2 bg-gray-100 text-gray-600 rounded-lg"><LogOut className="w-5 h-5" /></div>
                             <span className="text-gray-700 font-medium">로그아웃</span>

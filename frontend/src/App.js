@@ -99,8 +99,8 @@ function App() {
 
                       <Route 
                           path="/profile" 
-                          element={isLoggedIn ? <ProfileScreen userUid={userUid} /> : <Navigate to="/login" />} 
-                      />
+                          element={isLoggedIn ? <ProfileScreen userUid={userUid} onLogout={handleLogout} /> : <Navigate to="/login" />} 
+                       />
 
                       <Route 
                           path="/profile/reports" 
@@ -135,8 +135,8 @@ function App() {
                           element={isLoggedIn ? <NotificationSettingsScreen /> : <Navigate to="/login" />} />
                       <Route 
                           path="/profile/account" 
-                          element={isLoggedIn ? <AccountSettingsScreen /> : <Navigate to="/login" />} />
-   
+                          element={isLoggedIn ? <AccountSettingsScreen onLogout={handleLogout} /> : <Navigate to="/login" />} 
+                        />
                   </Routes>
                 </div>
                 {isLoggedIn && <BottomNavigation />}

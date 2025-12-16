@@ -7,7 +7,8 @@ import { useNavigate } from 'react-router-dom';
 
 const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
 
-export default function ProfileScreen({ userUid }) {
+// 🚨 onLogout을 props로 받습니다.
+export default function ProfileScreen({ userUid, onLogout }) {
     const navigate = useNavigate();
     
     const [userInfo, setUserInfo] = useState({
@@ -16,7 +17,7 @@ export default function ProfileScreen({ userUid }) {
         safeReturns: 0, 
         reports: 0, 
         usageTime: '0시간',
-        profileImage: null // 🚨 프로필 이미지 상태 추가
+        profileImage: null 
     });
 
     useEffect(() => {
@@ -32,16 +33,23 @@ export default function ProfileScreen({ userUid }) {
                     safeReturns: data.stats?.safeReturnCount || 0,
                     reports: data.stats?.reportCount || 0,
                     usageTime: data.stats?.usageTime || '0시간',
-                    profileImage: data.profileImage || null // 🚨 이미지 데이터 저장
+                    profileImage: data.profileImage || null 
                 });
             } catch (error) { console.error("프로필 로드 실패:", error); }
         };
         fetchUser();
     }, [userUid]);
 
+    // 🚨 [수정됨] 로그아웃 핸들러
     const handleLogout = () => {
         if (window.confirm('로그아웃 하시겠습니까?')) {
-            window.location.href = '/login'; 
+            // 부모 컴포넌트(App.js)에서 전달받은 onLogout 함수 실행
+            // (localStorage를 비우고 상태를 초기화하는 역할)
+            if (onLogout) {
+                onLogout();
+            }
+            // 로그인 화면으로 이동
+            navigate('/login'); 
         }
     };
 
@@ -57,7 +65,7 @@ export default function ProfileScreen({ userUid }) {
             <main className="flex-grow p-5 space-y-6 pb-24">
                 <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl p-6 text-white shadow-lg shadow-blue-200 transform transition hover:scale-[1.02]">
                     <div className="flex items-center space-x-4">
-                        {/* 🚨 이미지가 있으면 보여주고, 없으면 이니셜 보여주기 */}
+                        {/* 이미지가 있으면 보여주고, 없으면 이니셜 보여주기 */}
                         {userInfo.profileImage ? (
                             <img 
                                 src={userInfo.profileImage} 
