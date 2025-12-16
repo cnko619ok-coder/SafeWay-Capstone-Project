@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+// frontend/src/App.js
+
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useKakaoLoader } from 'react-kakao-maps-sdk'; // 🚨 Loader 임포트
+import { useKakaoLoader } from 'react-kakao-maps-sdk';
 import { Toaster } from 'sonner';
 
 import { AuthScreen } from './AuthScreen';
@@ -20,140 +22,126 @@ import ProfileEditScreen from './ProfileEditScreen';
 import NotificationSettingsScreen from './NotificationSettingsScreen';
 import AccountSettingsScreen from './AccountSettingsScreen';
 import NavigationScreen from './NavigationScreen';
-import { Shield } from 'lucide-react'; // 🚨 Shield 아이콘 import 필요
 import SplashScreen from './SplashScreen';
 
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'any';
 
-
 function App() {
-    // 로그인 상태와 사용자 UID를 저장할 상태
-    const [isLoggedIn, setIsLoggedIn] = useState(false); 
-    const [userUid, setUserUid] = useState(null); 
-    const [isLoading, setIsLoading] = useState(true); // 🚨 로딩 상태
+    // 🚨 [수정 1] 시작할 때 저장된 UID가 있는지 확인 (새로고침 방지)
+    const savedUid = localStorage.getItem('userUid');
+    
+    const [isLoggedIn, setIsLoggedIn] = useState(!!savedUid); 
+    const [userUid, setUserUid] = useState(savedUid); 
+    const [isLoading, setIsLoading] = useState(true);
 
-    // 🚨🚨🚨 [핵심 수정] 지도 SDK와 'services' 라이브러리를 여기서 미리 로드합니다.
     useKakaoLoader({
       appkey: "e8757f3638207e014bcea23f202b11d8",
-      libraries: ["services", "clusterer", "drawing"], // 주소 검색에 필수!
+      libraries: ["services", "clusterer", "drawing"], 
     });
 
-// 로그인 성공 핸들러
-  const handleLoginSuccess = (uid) => {
-      setUserUid(uid);
-      setIsLoggedIn(true);
-  };
+    // 🚨 [수정 2] 로그인 성공 시 저장소에 UID 저장
+    const handleLoginSuccess = (uid) => {
+        setUserUid(uid);
+        setIsLoggedIn(true);
+        localStorage.setItem('userUid', uid); // 영구 저장
+    };
 
-  // 로딩 화면 종료 핸들러
-  const handleSplashFinish = () => {
-      setIsLoading(false);
-  };
+    // 🚨 [추가] 로그아웃 기능 (필요시 사용)
+    const handleLogout = () => {
+        setUserUid(null);
+        setIsLoggedIn(false);
+        localStorage.removeItem('userUid');
+    };
 
-  // 🚨 로딩 중이면 SplashScreen 컴포넌트 표시
-  if (isLoading) {
-      return <SplashScreen onFinish={handleSplashFinish} />;
-  }
+    const handleSplashFinish = () => {
+        setIsLoading(false);
+    };
+
+    if (isLoading) {
+        return <SplashScreen onFinish={handleSplashFinish} />;
+    }
 
     return (
         <Router>
             <div className="flex flex-col min-h-screen bg-gray-50">
-                <Toaster position="top-center" /> {/* 🚨 토스트 알림 위치 설정 */}
+                <Toaster position="top-center" /> 
 
-                {/* 콘텐츠 영역 (메뉴바 높이만큼 하단 여백 추가: pb-20) */}
                 <div className={`flex-grow ${isLoggedIn ? 'pb-20' : ''}`}>
                   <Routes>
-                  {/* 로그인 화면: 로그인 상태가 아니면 AuthScreen 표시 */}
-                     <Route 
+                      <Route 
                         path="/login" 
                         element={isLoggedIn ? <Navigate to="/" /> : <AuthScreen onLoginSuccess={handleLoginSuccess} />} 
-                     />
+                      />
                 
-                  {/* 메인 화면: 로그인 상태가 아니면 /login으로 리다이렉트 */}
-                  <Route 
-                    path="/" 
-                    element={isLoggedIn ? <MainScreen userUid={userUid} /> : <Navigate to="/login" />} 
-                 />
+                      <Route 
+                        path="/" 
+                        element={isLoggedIn ? <MainScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                      />
                 
-                  {/* 긴급 연락처 화면: 로그인 상태일 때만 접근 가능 */}
-                  <Route 
-                      path="/contacts" 
-                      element={isLoggedIn ? <EmergencyContactScreen userUid={userUid} /> : <Navigate to="/login" />} 
-                  />
-                  {/* 🚨🚨🚨 경로 검색 라우트 추가 */}
-                  <Route 
-                     path="/route/search" 
-                     element={isLoggedIn ? <RouteSearchScreen userUid={userUid} /> : <Navigate to="/login" />}
-                  />
+                      <Route 
+                          path="/contacts" 
+                          element={isLoggedIn ? <EmergencyContactScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                      />
+                      <Route 
+                         path="/route/search" 
+                         element={isLoggedIn ? <RouteSearchScreen userUid={userUid} /> : <Navigate to="/login" />}
+                      />
         
-                  {/* 🚨🚨🚨 경로 결과 라우트 추가 */}
-                  <Route 
-                     path="/route/result" 
-                     element={isLoggedIn ? <RouteResultScreen userUid={userUid} /> : <Navigate to="/login" />} 
-                  />
+                      <Route 
+                         path="/route/result" 
+                         element={isLoggedIn ? <RouteResultScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                      />
                 
-                  {/* 🚨🚨🚨 위험 지역 게시판 라우트 연결 (수정됨) */}
-                  <Route 
-                      path="/report-board" 
-                      element={isLoggedIn ? <ReportBoardScreen userUid={userUid} /> : <Navigate to="/login" />} 
-                  />
+                      <Route 
+                          path="/report-board" 
+                          element={isLoggedIn ? <ReportBoardScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                      />
 
-                  {/* 🚨 프로필 화면 라우트 추가 */}
-                  <Route 
-                      path="/profile" 
-                      element={isLoggedIn ? <ProfileScreen userUid={userUid} /> : <Navigate to="/login" />} 
-                  />
+                      <Route 
+                          path="/profile" 
+                          element={isLoggedIn ? <ProfileScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                      />
 
-                  {/* 🚨 상세 화면 라우트 추가 */}
-                  <Route 
-                      path="/profile/reports" 
-                      element={isLoggedIn ? <MyReportsScreen userUid={userUid} /> : <Navigate to="/login" />} 
-                  />
-                  <Route 
-                      path="/profile/history" 
-                      element={isLoggedIn ? <ReturnHistoryScreen userUid={userUid} /> : <Navigate to="/login" />} 
-                  /> 
-                  <Route path="/report-board/:id" element={<ReportDetailScreen userUid={userUid} />} />
+                      <Route 
+                          path="/profile/reports" 
+                          element={isLoggedIn ? <MyReportsScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                      />
+                      <Route 
+                          path="/profile/history" 
+                          element={isLoggedIn ? <ReturnHistoryScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                      /> 
+                      <Route path="/report-board/:id" element={<ReportDetailScreen userUid={userUid} />} />
 
-                  {/* 🚨 SOS 화면 라우트 추가 */}
-                  <Route 
-                      path="/sos" 
-                      element={isLoggedIn ? <SOSScreen /> : <Navigate to="/login" />} 
-                  />
+                      <Route 
+                          path="/sos" 
+                          element={isLoggedIn ? <SOSScreen /> : <Navigate to="/login" />} 
+                      />
                 
-                  {/* 기본 접속 시 /login으로 이동 */}
-                  <Route path="*" element={<Navigate to="/login" />} />
+                      <Route path="*" element={<Navigate to="/login" />} />
   
-                  {/* 🚨 프로필 수정 화면 추가 */}
-                  <Route 
-                      path="/profile/edit" 
-                      element={isLoggedIn ? <ProfileEditScreen userUid={userUid} /> : <Navigate to="/login" />} 
-                  />
+                      <Route 
+                          path="/profile/edit" 
+                          element={isLoggedIn ? <ProfileEditScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                      />
 
-                  {/* 🚨 주행 안내 화면 라우트 추가 */}
-                  <Route 
-                      path="/navigation" 
-                      element={isLoggedIn ? <NavigationScreen /> : <Navigate to="/login" />} 
-                  />
+                      <Route 
+                          path="/navigation" 
+                          // 🚨 userUid를 넘겨주지만, 혹시 몰라 NavigationScreen 내부에서도 처리함
+                          element={isLoggedIn ? <NavigationScreen userUid={userUid} /> : <Navigate to="/login" />} 
+                      />
 
-                  {/* 🚨 설정 화면 라우트 추가 */}
-                  <Route 
-                      path="/profile/notifications" 
-                      element={isLoggedIn ? <NotificationSettingsScreen /> : <Navigate to="/login" />} />
-                  <Route 
-                      path="/profile/account" 
-                      element={isLoggedIn ? <AccountSettingsScreen /> : <Navigate to="/login" />} />
-
-                  <Route 
-                      path="/profile/history"  // 프로필 화면에서 이동하는 주소
-                      element={userUid ? <ReturnHistoryScreen userUid={userUid} /> : <Navigate to="/login" />} 
-                  />
+                      <Route 
+                          path="/profile/notifications" 
+                          element={isLoggedIn ? <NotificationSettingsScreen /> : <Navigate to="/login" />} />
+                      <Route 
+                          path="/profile/account" 
+                          element={isLoggedIn ? <AccountSettingsScreen /> : <Navigate to="/login" />} />
    
-            </Routes>
-            </div>
-            {/* 🚨 로그인 상태일 때만 하단 메뉴바 표시 (모든 화면 공통) */}
-            {isLoggedIn && <BottomNavigation />}
+                  </Routes>
+                </div>
+                {isLoggedIn && <BottomNavigation />}
 
-          </div>
+            </div>
         </Router>
     );
 }

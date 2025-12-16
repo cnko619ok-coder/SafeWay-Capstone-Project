@@ -6,9 +6,7 @@ import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk
 import { Phone, Check, AlertTriangle, Eye, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
-
-// 🚨 MainScreen.js와 동일한 설정 파일 사용
-import { API_BASE_URL } from './config'; 
+import { API_BASE_URL } from './config';
 
 const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8'; 
 
@@ -25,11 +23,14 @@ const MARKER_IMGS = {
     }
 };
 
-export default function NavigationScreen({ userUid }) {
+// 🚨 props로 받은 userUid와 저장소에 있는 userUid를 모두 확인
+export default function NavigationScreen({ userUid: propUserUid }) {
     const location = useLocation();
     const navigate = useNavigate();
     
-    // 데이터 받기
+    // 🚨 [핵심 수정] props가 없으면 localStorage에서 비상 복구!
+    const userUid = propUserUid || localStorage.getItem('userUid');
+
     const { path, routeInfo } = location.state || {};
 
     const [map, setMap] = useState(null);
@@ -47,29 +48,28 @@ export default function NavigationScreen({ userUid }) {
     const [contacts, setContacts] = useState([]);
     const watchId = useRef(null);
 
-    // 🚨 [진단용] 화면에 에러를 띄우기 위한 상태 변수
-    const [debugMsg, setDebugMsg] = useState("데이터 로딩 중...");
+    // 🚨 진단용 메시지 (성공하면 초록색, 실패하면 빨간색)
+    const [debugMsg, setDebugMsg] = useState("");
 
     // 1. 긴급 연락처 불러오기
     useEffect(() => {
-        // 화면 진단 메시지 업데이트
-        setDebugMsg(`시작: UID=${userUid ? userUid.slice(0,5)+'...' : '없음'} / URL=${API_BASE_URL}`);
-
         const fetchContacts = async () => {
             if (!userUid) {
-                setDebugMsg("❌ 오류: userUid가 없습니다. (로그인 풀림 의심)");
+                setDebugMsg("❌ 오류: 로그인이 필요합니다 (UID 없음)");
                 return;
             }
             try {
-                const url = `${API_BASE_URL}/api/contacts/${userUid}`;
-                const res = await axios.get(url);
+                // 🚨 서버 주소 디버깅
+                setDebugMsg(`연결 시도: ${API_BASE_URL} (UID: ${userUid.slice(0,4)}...)`);
+                
+                const res = await axios.get(`${API_BASE_URL}/api/contacts/${userUid}`);
                 setContacts(res.data);
                 
-                // 성공 메시지
-                setDebugMsg(`✅ 성공: 연락처 ${res.data.length}개 로드됨`);
+                // 성공 시 메시지 삭제 또는 성공 표시
+                setDebugMsg(""); 
+                console.log("✅ 연락처 로드 성공:", res.data);
             } catch (e) { 
-                // 실패 메시지 (화면에 띄움)
-                setDebugMsg(`❌ 실패: ${e.message}`);
+                setDebugMsg(`❌ 서버 연결 실패: ${e.message}`);
                 console.error(e);
             }
         };
@@ -83,7 +83,7 @@ export default function NavigationScreen({ userUid }) {
         const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
         const Δφ = (lat2 - lat1) * Math.PI / 180, Δλ = (lng2 - lng1) * Math.PI / 180;
         const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
     // 3. 위치 추적 로직
@@ -118,7 +118,7 @@ export default function NavigationScreen({ userUid }) {
 
                 const endPos = path[path.length - 1];
                 if (getDistance(newLat, newLng, endPos.lat, endPos.lng) < 30) {
-                    toast.success("도착 완료!");
+                    toast.success("목적지에 도착했습니다! 🎉");
                     navigator.geolocation.clearWatch(watchId.current);
                 }
             },
@@ -150,15 +150,13 @@ export default function NavigationScreen({ userUid }) {
 
     const triggerSOSAction = () => {
         if (contacts.length === 0) {
-            // 디버그 메시지 확인하라고 알림
-            toast.error("연락처 로드 실패. 상단 디버그 메시지를 확인하세요.");
-            // 🚨 비상시 112 연결 유지 (안전 제일)
+            toast.error("연락처를 불러오지 못했습니다. 112로 연결합니다.");
             window.location.href = 'tel:112';
             return;
         }
 
         const phoneNumbers = contacts.map(c => c.phone).join(',');
-        const message = `[SafeWay] SOS! 도와주세요! 위치: https://map.kakao.com/link/map/${currentPos?.lat},${currentPos?.lng}`;
+        const message = `[SafeWay 긴급] SOS! 도와주세요! 현재 위치: https://map.kakao.com/link/map/${currentPos?.lat},${currentPos?.lng}`;
         const separator = navigator.userAgent.match(/iPhone|iPad/i) ? '&' : '?';
         const smsLink = `sms:${phoneNumbers}${separator}body=${encodeURIComponent(message)}`;
         
@@ -171,12 +169,14 @@ export default function NavigationScreen({ userUid }) {
     return (
         <div className="min-h-screen bg-white flex flex-col font-sans relative">
             
-            {/* 🚨🚨🚨 [진단용 패널] 화면 맨 위에 상태를 표시합니다 🚨🚨🚨 */}
-            <div className="absolute top-0 left-0 right-0 bg-black/80 text-yellow-300 p-2 text-[10px] z-50 break-all">
-                DEBUG: {debugMsg}
-            </div>
+            {/* 🚨 디버그 메시지 패널 (오류 있을 때만 상단에 표시) */}
+            {debugMsg && (
+                <div className="absolute top-0 left-0 right-0 bg-black/80 text-yellow-300 p-2 text-[10px] z-50 break-all text-center">
+                    DEBUG: {debugMsg}
+                </div>
+            )}
 
-            {/* 상단바 (DEBUG 패널 때문에 top-12로 조금 내림) */}
+            {/* 상단바 */}
             <div className="absolute top-8 left-0 right-0 z-20 p-4 pt-4 pointer-events-none">
                 <div className="flex items-center justify-between pointer-events-auto">
                     <button onClick={() => navigate(-1)} className="bg-white p-3 rounded-full shadow-lg text-gray-700 hover:bg-gray-50 transition active:scale-95">
@@ -210,7 +210,6 @@ export default function NavigationScreen({ userUid }) {
                     <Polyline path={[remainPath]} strokeWeight={9} strokeColor={"#2563eb"} strokeOpacity={1} strokeStyle={"solid"} />
                 </Map>
 
-                {/* 범례 */}
                 <div className="absolute bottom-6 left-4 bg-white/90 backdrop-blur p-2.5 rounded-xl shadow-lg z-10 text-xs font-bold text-gray-600 space-y-1.5 border border-gray-100">
                     <div className="flex items-center"><div className="w-8 h-1.5 bg-[#2563eb] rounded mr-2"></div>남은 경로</div>
                     <div className="flex items-center"><div className="w-8 h-1.5 bg-[#cbd5e1] rounded mr-2"></div>지나온 길</div>
