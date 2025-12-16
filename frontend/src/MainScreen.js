@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate, Link } from 'react-router-dom';
-import { Shield, Users, AlertTriangle, Map as MapIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Shield, Users, Map as MapIcon, X, AlertTriangle, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
@@ -14,9 +14,12 @@ export default function MainScreen({ userUid }) {
     const [contacts, setContacts] = useState([]);
     const [myPos, setMyPos] = useState(null);
     
-    // 🚨 SOS 버튼 상태 관리 (누르고 있는지 확인용)
-    const [isSOSPressed, setIsSOSPressed] = useState(false);
-    const timerRef = useRef(null); // 타이머 저장용
+    // 🚨 SOS 모달 상태 관리
+    const [showSOSModal, setShowSOSModal] = useState(false);
+    const [progress, setProgress] = useState(0); // 게이지 (0~100)
+    const [isSent, setIsSent] = useState(false); // 전송 완료 여부
+    const requestRef = useRef(null);
+    const startTimeRef = useRef(null);
 
     // 1. 내 위치 확보
     useEffect(() => {
@@ -47,55 +50,72 @@ export default function MainScreen({ userUid }) {
         fetchData();
     }, [userUid]);
 
-    // 🚨 3. SOS 꾹 누르기 로직 (핵심 수정)
-    const startSOS = () => {
+    // 🚨 3. SOS 게이지 로직 (핵심)
+    const startHolding = () => {
         if (!myPos) {
             toast.error("위치 정보를 가져오는 중입니다...");
             return;
         }
+        if (isSent) return;
 
-        setIsSOSPressed(true); // 버튼 모양 변경 (눌림 효과)
+        startTimeRef.current = Date.now();
+        setIsSent(false);
 
-        // 2초 타이머 시작
-        timerRef.current = setTimeout(() => {
-            triggerSOSAction(); // 2초 뒤 실행
-            setIsSOSPressed(false); // 버튼 복구
-        }, 2000);
+        const animate = () => {
+            const elapsed = Date.now() - startTimeRef.current;
+            const newProgress = Math.min((elapsed / 2000) * 100, 100); // 2초 동안 0->100
+            
+            setProgress(newProgress);
+
+            if (newProgress < 100) {
+                requestRef.current = requestAnimationFrame(animate);
+            } else {
+                // 100% 도달 시 발송
+                handleSOSSend();
+            }
+        };
+        requestRef.current = requestAnimationFrame(animate);
     };
 
-    const endSOS = () => {
-        // 2초 전에 손을 떼면 취소
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-            setIsSOSPressed(false);
-        }
+    const stopHolding = () => {
+        if (isSent) return; // 이미 보내졌으면 취소 안 함
+        if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        setProgress(0); // 게이지 초기화
     };
 
     // 4. 실제 문자 발송 함수
-    const triggerSOSAction = () => {
-        // 연락처가 없으면 112
+    const handleSOSSend = () => {
+        setIsSent(true);
         if (contacts.length === 0) {
             if(window.confirm("등록된 비상연락처가 없습니다.\n112로 연결하시겠습니까?")) {
                 window.location.href = 'tel:112';
             }
+            setIsSent(false);
+            setProgress(0);
             return;
         }
 
-        // 연락처가 있으면 문자 발송
         const phoneNumbers = contacts.map(c => c.phone).join(',');
         const message = `[SafeWay 긴급] 도와주세요! 현재 위험한 상황입니다.\n위치: https://map.kakao.com/link/map/${myPos.lat},${myPos.lng}`;
         
         const separator = navigator.userAgent.match(/iPhone|iPad/i) ? '&' : '?';
         const smsLink = `sms:${phoneNumbers}${separator}body=${encodeURIComponent(message)}`;
         
-        window.location.href = smsLink;
-        
-        // 🚨 요청하신 메시지 출력
-        toast.success(`보호자 ${contacts.length}명에게 메시지 앱을 엽니다.`);
+        // 약간의 딜레이 후 실행 (UI 효과 보여주기 위함)
+        setTimeout(() => {
+            window.location.href = smsLink;
+            toast.success("메시지 앱을 엽니다.");
+            // 전송 후 모달 닫기
+            setTimeout(() => {
+                setShowSOSModal(false);
+                setIsSent(false);
+                setProgress(0);
+            }, 1000);
+        }, 500);
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+        <div className="min-h-screen bg-gray-50 flex flex-col font-sans relative">
             <header className="bg-white p-4 border-b flex items-center justify-between shadow-sm sticky top-0 z-10">
                 <h1 className="text-2xl font-bold text-gray-800 flex items-center">
                     <Shield className="w-6 h-6 text-blue-500 mr-2" /> SafeWay
@@ -157,29 +177,77 @@ export default function MainScreen({ userUid }) {
                 </section>
             </main>
 
-            {/* 🚨 SOS 플로팅 버튼 (꾹 누르기 기능 적용) */}
-            <div className="fixed bottom-24 right-4 z-40">
-                <button 
-                    onMouseDown={startSOS} 
-                    onMouseUp={endSOS} 
-                    onMouseLeave={endSOS}
-                    onTouchStart={startSOS} 
-                    onTouchEnd={endSOS}
-                    className={`p-4 rounded-full shadow-lg border-4 border-white transition-all duration-200 flex items-center justify-center 
-                        ${isSOSPressed 
-                            ? 'bg-red-700 scale-95 ring-8 ring-red-200 shadow-xl' // 눌렸을 때 스타일
-                            : 'bg-red-500 hover:bg-red-600 hover:scale-105 shadow-red-300 animate-pulse' // 평소 스타일
-                        }`}
-                >
-                    <span className="font-black text-xs text-white">SOS</span>
-                </button>
-                {/* 누르고 있을 때 도움말 표시 */}
-                {isSOSPressed && (
-                    <div className="absolute -top-10 right-0 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-                        2초간 누르세요...
+            {/* 🚨 메인화면 SOS 플로팅 버튼 (누르면 모달 열림) */}
+            <button 
+                onClick={() => setShowSOSModal(true)}
+                className="fixed bottom-24 right-4 bg-red-500 text-white p-4 rounded-full shadow-lg shadow-red-300 hover:bg-red-600 hover:scale-105 transition-all z-40 flex items-center justify-center border-4 border-white animate-pulse"
+            >
+                <span className="font-black text-xs">SOS</span>
+            </button>
+
+            {/* 🚨🚨🚨 SOS 전용 풀스크린 모달 🚨🚨🚨 */}
+            {showSOSModal && (
+                <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-xl flex flex-col items-center justify-center animate-fade-in">
+                    {/* 닫기 버튼 */}
+                    <button 
+                        onClick={() => { setShowSOSModal(false); setProgress(0); }}
+                        className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full hover:bg-gray-200"
+                    >
+                        <X className="w-8 h-8 text-gray-600" />
+                    </button>
+
+                    <h2 className="text-3xl font-black text-gray-900 mb-2">SOS 긴급 호출</h2>
+                    <p className="text-gray-500 mb-12 text-center px-4">
+                        버튼을 <span className="text-red-500 font-bold">2초간 꾹 누르면</span><br/>
+                        보호자 <span className="font-bold text-gray-800">{contacts.length}명</span>에게 문자가 전송됩니다.
+                    </p>
+
+                    {/* 🔴 게이지 버튼 (SVG 애니메이션 적용) */}
+                    <div className="relative mb-10">
+                        {/* 배경 원 */}
+                        <svg className="w-64 h-64 transform -rotate-90">
+                            <circle
+                                cx="128" cy="128" r="120"
+                                stroke="#fee2e2" strokeWidth="12" fill="none"
+                            />
+                            {/* 게이지 원 */}
+                            <circle
+                                cx="128" cy="128" r="120"
+                                stroke="#ef4444" strokeWidth="12" fill="none"
+                                strokeDasharray={2 * Math.PI * 120}
+                                strokeDashoffset={2 * Math.PI * 120 * (1 - progress / 100)}
+                                className="transition-all duration-[50ms] ease-linear"
+                            />
+                        </svg>
+
+                        {/* 실제 누르는 버튼 (가운데) */}
+                        <button
+                            onMouseDown={startHolding} onMouseUp={stopHolding} onMouseLeave={stopHolding}
+                            onTouchStart={startHolding} onTouchEnd={stopHolding}
+                            className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full shadow-2xl flex flex-col items-center justify-center transition-all ${isSent ? 'bg-green-500' : 'bg-red-500 active:scale-95'}`}
+                        >
+                            {isSent ? (
+                                <>
+                                    <Check className="w-16 h-16 text-white mb-2" />
+                                    <span className="text-white font-bold text-xl">전송 완료!</span>
+                                </>
+                            ) : (
+                                <>
+                                    <AlertTriangle className="w-16 h-16 text-white mb-2" />
+                                    <span className="text-white font-black text-3xl tracking-widest">SOS</span>
+                                    {progress > 0 && progress < 100 && (
+                                        <span className="text-white/90 text-sm mt-1 font-medium">전송 중...</span>
+                                    )}
+                                </>
+                            )}
+                        </button>
                     </div>
-                )}
-            </div>
+
+                    <p className="text-sm text-gray-400 font-medium animate-pulse">
+                        {isSent ? "잠시 후 화면이 닫힙니다." : "위급 상황 시 꾹 눌러주세요"}
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
