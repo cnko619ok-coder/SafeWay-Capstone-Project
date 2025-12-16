@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk';
-import { Phone, Check, AlertTriangle, Eye, ArrowLeft, ChevronUp, ChevronDown } from 'lucide-react';
+import { Phone, Check, AlertTriangle, Eye, ArrowLeft } from 'lucide-react'; // 🚨 Chevron 아이콘 제거
 import axios from 'axios';
 import { toast } from 'sonner';
 import { API_BASE_URL } from './config';
@@ -43,7 +43,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
 
     const [isSheetOpen, setIsSheetOpen] = useState(true);
 
-    // 🚨 [설정값 유지 - 시간창 위치 절대 건드리지 않음] 🚨
+    // 🚨 [설정값 유지] 🚨
     const SHEET_HEIGHT = 460; 
     const CLOSED_POS = 100;   
     const OPEN_POS = SHEET_HEIGHT + 15; 
@@ -174,7 +174,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </button>
             </div>
 
-            {/* 2. 시간 정보 카드 (유지) */}
+            {/* 2. 시간 정보 카드 (세모 -> 선으로 변경) */}
             <div 
                 className="fixed left-4 right-4 z-50 transition-all duration-300 ease-in-out"
                 style={{ 
@@ -192,9 +192,10 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                             <span className="text-lg ml-1 text-blue-500 font-bold">분</span>
                         </p>
                     </div>
-                    <div className="opacity-30">
-                        {isSheetOpen ? <ChevronDown className="w-5 h-5"/> : <ChevronUp className="w-5 h-5"/>}
-                    </div>
+                    
+                    {/* 🚨 [수정] 화살표 대신 회색 세로선 추가 */}
+                    <div className="h-10 w-[1px] bg-gray-200 mx-4"></div>
+
                     <div className="text-right">
                         <p className="text-xs font-bold text-gray-400 mb-1">도착 예정</p>
                         <p className="text-xl font-bold text-gray-800 tracking-tight">
@@ -218,12 +219,10 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                     <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
                 </div>
 
-                {/* 🚨 내용물 컨테이너 (핵심 수정) 🚨 */}
-                {/* justify-center 제거. pt-10으로 상단 여백 확보. pb-14로 하단 안전 여백 확보. justify-start로 위에서부터 배치 */}
+                {/* 내용물 컨테이너 */}
                 <div className="px-6 pt-10 pb-14 flex flex-col h-full items-center justify-start">
                     
                     {/* 보호자 모니터링 */}
-                    {/* 🚨 mb-6: SOS 버튼과의 간격을 넓힘 */}
                     <div className="w-full bg-blue-50/80 px-4 py-3 rounded-xl flex items-center justify-between border border-blue-100 flex-shrink-0 mb-6">
                         <div className="flex items-center text-xs font-bold text-gray-700">
                             <Eye className="w-3 h-3 mr-2 text-green-500 animate-pulse" /> 
@@ -243,7 +242,6 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                     </div>
 
                     {/* SOS 버튼 */}
-                    {/* 불필요한 margin 제거 */}
                     <div className="flex flex-col items-center justify-center">
                         <button
                             onMouseDown={startSOS} 
@@ -269,7 +267,6 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                     </div>
 
                     {/* 하단 버튼 */}
-                    {/* 🚨 mt-8: SOS 버튼과의 간격을 넓힘 */}
                     <div className="w-full grid grid-cols-2 gap-3 mt-8">
                         <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-3.5 rounded-xl font-bold shadow-sm active:scale-95 transition-transform text-sm">
                             <Phone className="w-4 h-4 mr-2 text-gray-500" /> 112 신고
