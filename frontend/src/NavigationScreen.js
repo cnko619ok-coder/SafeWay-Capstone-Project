@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk';
-import { Phone, Check, AlertTriangle, Eye, ArrowLeft, ChevronUp } from 'lucide-react'; // ChevronUp 추가
+import { Phone, Check, AlertTriangle, Eye, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { API_BASE_URL } from './config';
@@ -46,24 +46,21 @@ export default function NavigationScreen({ userUid: propUserUid }) {
     const watchId = useRef(null);
     const [debugMsg, setDebugMsg] = useState("");
 
-    // 🚨 시트 열림/닫힘 상태
+    // 시트 열림/닫힘 상태
     const [isSheetOpen, setIsSheetOpen] = useState(true);
+
+    // 🚨🚨🚨 [수정됨] 시트 높이 설정 (넉넉하게 잡음) 🚨🚨🚨
+    const SHEET_HEIGHT = 520; // 전체 높이 (버튼 안 잘리게 넉넉히)
+    const HANDLE_HEIGHT = 50; // 닫혔을 때 남겨둘 손잡이 높이
 
     // 1. 긴급 연락처 불러오기
     useEffect(() => {
         const fetchContacts = async () => {
-            if (!userUid) {
-                setDebugMsg("❌ 오류: UID 없음");
-                return;
-            }
+            if (!userUid) return;
             try {
-                setDebugMsg(`연결: ${API_BASE_URL}`);
                 const res = await axios.get(`${API_BASE_URL}/api/contacts/${userUid}`);
                 setContacts(res.data);
-                setDebugMsg(""); 
-            } catch (e) { 
-                setDebugMsg(`❌ 실패: ${e.message}`);
-            }
+            } catch (e) { console.error(e); }
         };
         fetchContacts();
     }, [userUid]);
@@ -125,7 +122,6 @@ export default function NavigationScreen({ userUid: propUserUid }) {
         };
     }, [path, map, routeInfo, navigate]);
 
-    // SOS 로직
     const startSOS = () => {
         setIsSOSPressed(true);
         sosTimerRef.current = setTimeout(() => {
@@ -156,21 +152,10 @@ export default function NavigationScreen({ userUid: propUserUid }) {
 
     if (!path) return <div className="flex justify-center items-center h-screen">로딩중...</div>;
 
-    // 🚨 시트 높이 상수 설정 (버튼 잘림 방지용)
-    const SHEET_HEIGHT = 420; // 열렸을 때 높이
-    const COLLAPSED_HEIGHT = 40; // 닫혔을 때 손잡이만 보임
-
     return (
         <div className="fixed inset-0 bg-gray-100 font-sans overflow-hidden">
             
-            {/* 디버그 패널 */}
-            {debugMsg && (
-                <div className="absolute top-0 left-0 right-0 bg-black/80 text-yellow-300 p-1 text-[10px] z-50 text-center">
-                    {debugMsg}
-                </div>
-            )}
-
-            {/* 1. 지도 (전체 화면) */}
+            {/* 1. 지도 */}
             <div className="absolute inset-0 z-0">
                 <Map center={currentPos || path[0]} style={{ width: "100%", height: "100%" }} level={3} appkey={KAKAO_APP_KEY} onCreate={setMap}>
                     <MapMarker position={path[0]} image={MARKER_IMGS.start} />
@@ -195,12 +180,12 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </button>
             </div>
 
-            {/* 2. 시간 정보 카드 (애니메이션 적용) */}
-            {/* 시트가 열려있으면 시트 위, 닫혀있으면 바닥 위 50px에 위치 */}
+            {/* 2. 시간 정보 카드 (동적 위치) */}
             <div 
-                className={`absolute left-4 right-4 z-20 transition-all duration-300 ease-in-out`}
+                className="absolute left-4 right-4 z-20 transition-all duration-300 ease-in-out"
                 style={{ 
-                    bottom: isSheetOpen ? `${SHEET_HEIGHT + 20}px` : '60px' // 닫히면 바닥에서 60px 위에 뜸
+                    // 🚨 열렸을 땐 시트 위(530px), 닫혔을 땐 핸들 위(70px)
+                    bottom: isSheetOpen ? `${SHEET_HEIGHT + 10}px` : `${HANDLE_HEIGHT + 20}px` 
                 }}
             >
                 <div className="bg-white rounded-3xl shadow-xl p-5 flex items-center justify-between border border-gray-100">
@@ -221,28 +206,29 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </div>
             </div>
 
-            {/* 3. 슬라이딩 바텀 시트 (SOS + 버튼들) */}
+            {/* 3. 슬라이딩 바텀 시트 */}
             <div 
                 className="fixed left-0 right-0 z-30 bg-white rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-in-out"
                 style={{ 
                     bottom: 0,
                     height: `${SHEET_HEIGHT}px`,
-                    transform: isSheetOpen ? 'translateY(0)' : `translateY(${SHEET_HEIGHT - COLLAPSED_HEIGHT}px)`
+                    // 🚨 핵심: 닫혔을 때 HANDLE_HEIGHT 만큼만 남기고 내려감
+                    transform: isSheetOpen ? 'translateY(0)' : `translateY(${SHEET_HEIGHT - HANDLE_HEIGHT}px)`
                 }}
             >
-                {/* 핸들 (클릭 시 열고 닫기) */}
+                {/* 핸들 (이 부분을 누르면 열리고 닫힘) */}
                 <div 
                     onClick={() => setIsSheetOpen(!isSheetOpen)}
-                    className="w-full h-10 flex items-center justify-center cursor-pointer active:bg-gray-50 rounded-t-[2.5rem]"
+                    className="w-full h-[50px] flex items-center justify-center cursor-pointer active:bg-gray-50 rounded-t-[2.5rem]"
                 >
                     <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
                 </div>
 
-                {/* 시트 내용물 (여백 확보로 버튼 잘림 해결) */}
-                <div className="px-6 pb-8 h-full flex flex-col justify-between">
+                {/* 시트 내용물 (flex-1로 공간 자동 분배) */}
+                <div className="px-6 pb-10 flex flex-col h-[470px] justify-between">
                     
                     {/* 보호자 모니터링 */}
-                    <div className="bg-blue-50/80 p-4 rounded-2xl flex items-center justify-between border border-blue-100">
+                    <div className="bg-blue-50/80 p-4 rounded-2xl flex items-center justify-between border border-blue-100 mt-2">
                         <div className="flex items-center text-sm font-bold text-gray-700">
                             <Eye className="w-4 h-4 mr-2 text-green-500 animate-pulse" /> 
                             안심 귀가 모니터링 중
@@ -260,33 +246,33 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                         </div>
                     </div>
 
-                    {/* SOS 버튼 (중앙) */}
-                    <div className="flex flex-col items-center justify-center py-2 relative">
+                    {/* SOS 버튼 (중앙 배치) */}
+                    <div className="flex flex-col items-center justify-center relative flex-grow">
                         <button
                             onMouseDown={startSOS} 
                             onMouseUp={endSOS} 
                             onMouseLeave={endSOS}
                             onTouchStart={startSOS} 
                             onTouchEnd={endSOS}
-                            className={`w-28 h-28 rounded-full flex flex-col items-center justify-center text-white shadow-xl transition-all duration-200 
+                            className={`w-32 h-32 rounded-full flex flex-col items-center justify-center text-white shadow-xl transition-all duration-200 
                                 ${isSOSPressed 
                                     ? 'bg-red-700 scale-95 ring-8 ring-red-200' 
                                     : 'bg-red-500 hover:bg-red-600 ring-4 ring-red-100 animate-pulse'}`}
                         >
-                            <AlertTriangle className="w-8 h-8 mb-1" />
-                            <span className="text-xl font-black tracking-widest">SOS</span>
+                            <AlertTriangle className="w-10 h-10 mb-1" />
+                            <span className="text-2xl font-black tracking-widest">SOS</span>
                         </button>
                         
                         {isSOSPressed && (
-                            <div className="absolute top-0 right-4 bg-gray-800 text-white text-xs px-2 py-1 rounded animate-bounce">
+                            <div className="absolute top-4 right-4 bg-gray-800 text-white text-xs px-2 py-1 rounded animate-bounce">
                                 전송 중...
                             </div>
                         )}
-                        <p className="text-[10px] text-gray-400 mt-3">위급 시 2초간 꾹 눌러주세요</p>
+                        <p className="text-[10px] text-gray-400 mt-4">위급 시 2초간 꾹 눌러주세요</p>
                     </div>
 
-                    {/* 하단 버튼 2개 (여백 충분히 확보) */}
-                    <div className="grid grid-cols-2 gap-3 mb-4">
+                    {/* 하단 버튼 2개 (바닥에 붙어서 잘림 방지) */}
+                    <div className="grid grid-cols-2 gap-3 pb-4">
                         <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-4 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform">
                             <Phone className="w-5 h-5 mr-2 text-gray-500" /> 112 신고
                         </a>
