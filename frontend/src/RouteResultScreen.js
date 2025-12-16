@@ -21,23 +21,34 @@ export default function RouteResultScreen({ userUid }) {
 
     // 백엔드에서 받아온 진짜 경로(path)를 그대로 사용합니다.
     const { safety, shortest, balanced } = routeData;
-    // 🚨 2. 실제 경로 데이터 상태 (초기값 null)
-   // const [realPath, setRealPath] = useState(null);
 
     // 1. 초기 경로 데이터 설정 (백엔드 데이터가 없을 때 대비)
     const safePath = routeData?.safety?.path || [];
     const shortestPath = routeData?.shortest?.path || [];
     const balancedPath = routeData?.balanced?.path || [];
 
-    // 🚨 3. 지도 자동 줌 및 위치 보정 (핵심 수정!)
+    // 🚨 3. 지도 자동 줌 및 위치 보정 (수정됨: 중앙 정렬 & 하단 시트 고려)
     useEffect(() => {
-        if (map && safePath.length > 0) {
+        if (map && (safePath.length > 0 || shortestPath.length > 0 || balancedPath.length > 0)) {
             const bounds = new window.kakao.maps.LatLngBounds();
-            safePath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            if (shortestPath.length > 0) shortestPath.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
-            map.setBounds(bounds, 80, 0, 0, 300); 
+            
+            // 모든 경로의 좌표를 범위에 포함시킵니다.
+            const addPathToBounds = (path) => {
+                path?.forEach(p => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+            };
+
+            addPathToBounds(safePath);
+            addPathToBounds(shortestPath);
+            addPathToBounds(balancedPath);
+
+            // 🚨 패딩 설정 (상, 우, 하, 좌)
+            // 상: 80 (상단 여유)
+            // 우: 50 (우측 여유)
+            // 하: 200 (하단 시트가 올라와도 경로가 가려지지 않게 위로 띄움)
+            // 좌: 50 (기존 300에서 50으로 줄여서 중앙 정렬)
+            map.setBounds(bounds, 80, 50, 200, 50); 
         }
-    }, [map, safePath, shortestPath]);
+    }, [map, safePath, shortestPath, balancedPath]);
 
     // 4. 데이터 없음 예외 처리
     if (!routeData) {
@@ -105,16 +116,16 @@ export default function RouteResultScreen({ userUid }) {
                 <Map center={safePath[0]|| {lat: 37.5665, lng: 126.9780}} style={{ width: "100%", height: "100%" }} level={2} appkey={KAKAO_APP_KEY} onCreate={setMap}>
                    <MapMarker position={safePath[0]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/red_b.png", size: {width: 40, height: 45}}}/>
                    <MapMarker position={safePath[safePath.length-1]} image={{src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/blue_b.png", size: {width: 40, height: 45}}}/>
-                    
-                    {/* 🟢 안전 경로 (초록색 실선 - 가장 위) */}
-                    <Polyline path={[safePath]} strokeWeight={8} strokeColor={"#10b981"} strokeOpacity={1} strokeStyle={"solid"} />
-                    
-                    {/* 🟠 최단 경로 (주황색 점선) */}
-                    <Polyline path={[shortestPath]} strokeWeight={5} strokeColor={"#f59e0b"} strokeOpacity={0.7} strokeStyle={"shortdash"} />
-                    
-                    {/* 🟡 균형 경로 (노란색 점선) */}
-                    <Polyline path={[balancedPath]} strokeWeight={5} strokeColor={"#eab308"} strokeOpacity={0.7} strokeStyle={"shortdot"} />
-                    </Map>
+                   
+                   {/* 🟢 안전 경로 (초록색 실선 - 가장 위) */}
+                   <Polyline path={[safePath]} strokeWeight={8} strokeColor={"#10b981"} strokeOpacity={1} strokeStyle={"solid"} />
+                   
+                   {/* 🟠 최단 경로 (주황색 점선) */}
+                   <Polyline path={[shortestPath]} strokeWeight={5} strokeColor={"#f59e0b"} strokeOpacity={0.7} strokeStyle={"shortdash"} />
+                   
+                   {/* 🟡 균형 경로 (노란색 점선) */}
+                   <Polyline path={[balancedPath]} strokeWeight={5} strokeColor={"#eab308"} strokeOpacity={0.7} strokeStyle={"shortdot"} />
+                   </Map>
             </div>
 
             {/* 🚨🚨🚨 [추가됨] 경로 범례 (Legend) 🚨🚨🚨 */}
