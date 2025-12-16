@@ -8,9 +8,8 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner'; // 알림용 라이브러리 (없으면 alert 대체 가능)
+import { API_BASE_URL } from './config';
 
-// 🚨 ngrok 주소 (사용자님 주소로 설정됨)
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
 
 export default function ReportBoardScreen({ userUid }) {
     const navigate = useNavigate();

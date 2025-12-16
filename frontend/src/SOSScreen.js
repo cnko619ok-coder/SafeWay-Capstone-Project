@@ -5,9 +5,7 @@ import axios from 'axios'; // 🚨 API 호출을 위해 추가
 import { ArrowLeft, Phone, AlertTriangle, X, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-
-// 🚨 API 주소 확인
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
+import { API_BASE_URL } from './config';
 
 // 🚨 userUid를 props로 받아와야 합니다.
 export default function SOSScreen({ userUid }) {

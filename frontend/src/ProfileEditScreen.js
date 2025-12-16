@@ -4,8 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { ArrowLeft, Camera, User, Mail, Phone, MapPin } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
+import { API_BASE_URL } from './config';
 
 export default function ProfileEditScreen({ userUid }) {
     const navigate = useNavigate();

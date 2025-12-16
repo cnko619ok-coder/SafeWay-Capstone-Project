@@ -5,8 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, Plus, Trash2, Phone, User, Calendar, ArrowDownAZ,X } from 'lucide-react';
 import { toast } from 'sonner';
+import { API_BASE_URL } from './config';
 
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
 
 export default function EmergencyContactScreen({ userUid }) {
     const navigate = useNavigate();

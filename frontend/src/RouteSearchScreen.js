@@ -5,9 +5,7 @@ import axios from 'axios';
 import { Search, MapPin, ArrowLeft, Clock, Map as MapIcon, Crosshair, Star, MinusCircle, Shield, Camera, Lightbulb, Scale, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-
-// 🚨 ngrok 주소 확인
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
+import { API_BASE_URL } from './config';
 
 const DUMMY_PATH = [
   { lat: 37.5668, lng: 126.9790 }, { lat: 37.5670, lng: 126.9792 }, { lat: 37.5672, lng: 126.9794 }, 

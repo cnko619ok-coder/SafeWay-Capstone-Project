@@ -6,8 +6,7 @@ import axios from 'axios';
 // 🚨 'X' 아이콘이 필요합니다.
 import { ArrowLeft, MapPin, Clock, ThumbsUp, MessageSquare, Send, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
+import { API_BASE_URL } from './config';
 
 export default function ReportDetailScreen({ userUid }) {
     const { id } = useParams();

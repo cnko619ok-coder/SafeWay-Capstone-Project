@@ -6,11 +6,9 @@ import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk
 import { Phone, Check, AlertTriangle, Eye, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { API_BASE_URL } from './config';
 
 const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8'; 
-
-// 🚨🚨🚨 [매우 중요] 이 주소가 MainScreen.js와 똑같은지 꼭 확인하세요! 🚨🚨🚨
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
 
 const MARKER_IMGS = {
     start: {

@@ -5,8 +5,8 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Users, Map as MapIcon, X, AlertTriangle, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { API_BASE_URL } from './config';
 
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
 
 export default function MainScreen({ userUid }) { 
     const navigate = useNavigate();

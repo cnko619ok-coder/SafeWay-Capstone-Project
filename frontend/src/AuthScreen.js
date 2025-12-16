@@ -6,8 +6,8 @@ import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { auth } from './firebase';
 import { Shield, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import { API_BASE_URL } from './config';
 
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
 
 // 🚨 onLoginSuccess prop을 받도록 수정되었습니다.
 export function AuthScreen({ onLoginSuccess }) { 

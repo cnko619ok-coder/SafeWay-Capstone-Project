@@ -5,8 +5,7 @@ import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Trash2, Edit2, MapPin, Clock, FileText, X } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
+import { API_BASE_URL } from './config';
 
 export default function MyReportsScreen({ userUid }) {
     const navigate = useNavigate();

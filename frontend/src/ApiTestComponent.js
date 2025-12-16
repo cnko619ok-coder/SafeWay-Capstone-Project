@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios'; 
+import { API_BASE_URL } from './config';
 // 이 코드를 실행하기 전에 반드시 'npm install axios'를 실행했는지 확인하세요.
 
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; // 🚨 백엔드 서버 주소 (3005번 포트)
 
 // 가상의 경로 좌표 데이터 (테스트용)
 // 이 데이터가 백엔드의 안전 점수 API로 전송됩니다.

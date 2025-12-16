@@ -5,10 +5,9 @@ import { useLocation, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Shield, Clock, MapPin, Navigation, Camera, Lightbulb, ChevronLeft, AlertTriangle, Scale } from 'lucide-react';
 import { Map, MapMarker, Polyline } from 'react-kakao-maps-sdk';
+import { API_BASE_URL } from './config';
 
 const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8'; 
-const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev';
-
 
 
 export default function RouteResultScreen({ userUid }) {
