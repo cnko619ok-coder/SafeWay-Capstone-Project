@@ -146,7 +146,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
     return (
         <div className="fixed inset-0 bg-gray-100 font-sans overflow-hidden">
             
-            {/* 1. 지도 (전체 화면) */}
+            {/* 1. 지도 (배경) */}
             <div className="absolute inset-0 z-0">
                 <Map center={currentPos || path[0]} style={{ width: "100%", height: "100%" }} level={3} appkey={KAKAO_APP_KEY} onCreate={setMap}>
                     <MapMarker position={path[0]} image={MARKER_IMGS.start} />
@@ -171,113 +171,114 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </button>
             </div>
 
-            {/* 🚨🚨🚨 통합 슬라이딩 시트 (완벽 수정) 🚨🚨🚨 */}
-            {/* z-50: 가장 위에 표시 / bottom-0: 바닥에 고정 */}
+            {/* 🚨🚨🚨 2. 시간 정보 카드 (독립적인 레이어) 🚨🚨🚨 */}
+            {/* isSheetOpen 상태에 따라 바닥에서의 위치(bottom)가 달라집니다. */}
             <div 
-                className={`fixed left-0 right-0 bottom-0 z-50 transition-transform duration-300 ease-in-out flex flex-col`}
-                style={{ 
-                    // 닫혔을 때는 "전체 높이 - 140px(헤더높이)" 만큼만 내려갑니다.
-                    // 140px은 시간창이 보여질 높이입니다. 절대 사라지지 않습니다.
-                    transform: isSheetOpen ? 'translateY(0)' : 'translateY(calc(100% - 140px))' 
-                }}
+                className={`fixed left-4 right-4 z-40 transition-all duration-300 ease-in-out
+                ${isSheetOpen ? 'bottom-[410px]' : 'bottom-6'}`} // 열리면 위로, 닫히면 바닥으로
             >
-                {/* 1️⃣ 헤더: 시간 정보 카드 (항상 보임) */}
-                {/* 배경을 투명하게 하고 카드만 띄워서 입체감을 줍니다 */}
                 <div 
                     onClick={() => setIsSheetOpen(!isSheetOpen)}
-                    className="w-full flex justify-center pb-2 cursor-pointer active:scale-[0.99] transition-transform"
-                    style={{ height: '140px' }} // 높이 고정
+                    className="bg-white rounded-3xl shadow-xl p-4 flex items-center justify-between border border-gray-100 cursor-pointer active:scale-[0.99] transition-transform"
                 >
-                    <div className="w-[92%] bg-white rounded-3xl shadow-2xl p-5 flex items-center justify-between border border-gray-100 relative top-4">
-                        <div>
-                            <p className="text-xs font-bold text-gray-400 mb-1">남은 시간</p>
-                            <p className="text-4xl font-black text-blue-600 tracking-tighter">
-                                {remainingTimeStr?.replace(/[^0-9]/g, '') || '0'}
-                                <span className="text-xl ml-1 text-blue-500 font-bold">분</span>
-                            </p>
-                        </div>
-                        
-                        {/* 아이콘 */}
-                        <div className="opacity-30">
-                            {isSheetOpen ? <ChevronDown className="w-6 h-6" /> : <ChevronUp className="w-6 h-6" />}
-                        </div>
-
-                        <div className="text-right">
-                            <p className="text-xs font-bold text-gray-400 mb-1">도착 예정</p>
-                            <p className="text-2xl font-bold text-gray-800 tracking-tight">
-                                {arrivalTimeStr || '--:--'}
-                            </p>
-                        </div>
+                    <div>
+                        <p className="text-xs font-bold text-gray-400 mb-1">남은 시간</p>
+                        <p className="text-3xl font-black text-blue-600 tracking-tighter">
+                            {remainingTimeStr?.replace(/[^0-9]/g, '') || '0'}
+                            <span className="text-lg ml-1 text-blue-500 font-bold">분</span>
+                        </p>
+                    </div>
+                    {/* 접기/펴기 아이콘 */}
+                    <div className="opacity-30">
+                        {isSheetOpen ? <ChevronDown className="w-5 h-5"/> : <ChevronUp className="w-5 h-5"/>}
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xs font-bold text-gray-400 mb-1">도착 예정</p>
+                        <p className="text-xl font-bold text-gray-800 tracking-tight">
+                            {arrivalTimeStr || '--:--'}
+                        </p>
                     </div>
                 </div>
+            </div>
 
-                {/* 2️⃣ 바디: SOS 및 버튼 패널 */}
-                <div className="bg-white rounded-t-[2.5rem] shadow-[0_-5px_30px_rgba(0,0,0,0.1)] -mt-6 pt-8 relative z-[-1]">
+            {/* 🚨🚨🚨 3. 하단 SOS 시트 (독립적인 레이어) 🚨🚨🚨 */}
+            {/* isSheetOpen 상태에 따라 화면 밖으로 나가거나 들어옵니다. */}
+            <div 
+                className={`fixed left-0 right-0 bottom-0 z-30 bg-white rounded-t-[2.5rem] shadow-[0_-5px_30px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-in-out
+                ${isSheetOpen ? 'translate-y-0' : 'translate-y-full'}`} // 열리면 0, 닫히면 화면 밖으로(full)
+                style={{ height: '400px' }} // 높이 고정
+            >
+                {/* 핸들 */}
+                <div 
+                    onClick={() => setIsSheetOpen(!isSheetOpen)}
+                    className="w-full h-[40px] flex items-center justify-center cursor-pointer active:bg-gray-50 rounded-t-[2.5rem]"
+                >
+                    <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+                </div>
+
+                {/* 내용물 컨테이너 */}
+                {/* 🚨 핵심: pb-20으로 매우 넉넉한 하단 패딩 확보 -> 버튼 잘림 완벽 방지 */}
+                <div className="px-6 pb-20 flex flex-col justify-between h-[calc(100%-40px)]">
                     
-                    {/* 내용물 컨테이너 */}
-                    {/* 🚨 핵심: pb-20 (80px) 여백으로 버튼을 위로 확 띄웁니다! */}
-                    <div className="px-6 pb-20 flex flex-col gap-3">
-                        
-                        {/* 보호자 모니터링 */}
-                        <div className="bg-blue-50/80 p-3 rounded-2xl flex items-center justify-between border border-blue-100">
-                            <div className="flex items-center text-sm font-bold text-gray-700">
-                                <Eye className="w-4 h-4 mr-2 text-green-500 animate-pulse" /> 
-                                안심 귀가 모니터링 중
-                            </div>
-                            <div className="flex -space-x-2">
-                                {contacts.length > 0 ? (
-                                    contacts.slice(0, 3).map((c, i) => (
-                                        <div key={i} className="w-7 h-7 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-blue-700 shadow-sm">
-                                            {c.name[0]}
-                                        </div>
-                                    ))
-                                ) : (
-                                    <span className="text-xs text-gray-400">보호자 없음</span>
-                                )}
-                            </div>
+                    {/* 보호자 모니터링 */}
+                    <div className="bg-blue-50/80 p-3 rounded-2xl flex items-center justify-between border border-blue-100 mt-2">
+                        <div className="flex items-center text-sm font-bold text-gray-700">
+                            <Eye className="w-4 h-4 mr-2 text-green-500 animate-pulse" /> 
+                            안심 귀가 모니터링 중
                         </div>
-
-                        {/* SOS 버튼 (중앙) */}
-                        <div className="flex flex-col items-center justify-center relative py-1">
-                            <button
-                                onMouseDown={startSOS} 
-                                onMouseUp={endSOS} 
-                                onMouseLeave={endSOS}
-                                onTouchStart={startSOS} 
-                                onTouchEnd={endSOS}
-                                className={`w-24 h-24 rounded-full flex flex-col items-center justify-center text-white shadow-xl transition-all duration-200 
-                                    ${isSOSPressed 
-                                        ? 'bg-red-700 scale-95 ring-8 ring-red-200' 
-                                        : 'bg-red-500 hover:bg-red-600 ring-4 ring-red-100 animate-pulse'}`}
-                            >
-                                <AlertTriangle className="w-8 h-8 mb-1" />
-                                <span className="text-xl font-black tracking-widest">SOS</span>
-                            </button>
-                            
-                            {isSOSPressed && (
-                                <div className="absolute top-0 right-10 bg-gray-800 text-white text-xs px-2 py-1 rounded animate-bounce">
-                                    전송 중...
-                                </div>
+                        <div className="flex -space-x-2">
+                            {contacts.length > 0 ? (
+                                contacts.slice(0, 3).map((c, i) => (
+                                    <div key={i} className="w-6 h-6 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-xs font-bold text-blue-700 shadow-sm">
+                                        {c.name[0]}
+                                    </div>
+                                ))
+                            ) : (
+                                <span className="text-xs text-gray-400">보호자 없음</span>
                             )}
-                            <p className="text-[10px] text-gray-400 mt-2">위급 시 2초간 꾹</p>
                         </div>
+                    </div>
 
-                        {/* 하단 버튼 2개 (SOS 버튼과 가깝게) */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-3.5 rounded-xl font-bold shadow-sm active:scale-95 transition-transform">
-                                <Phone className="w-5 h-5 mr-2 text-gray-500" /> 112 신고
-                            </a>
-                            <button 
-                                onClick={() => { 
-                                    if(watchId.current) navigator.geolocation.clearWatch(watchId.current);
-                                    toast.success("안전하게 도착했습니다!"); 
-                                    navigate('/'); 
-                                }}
-                                className="flex items-center justify-center bg-green-500 text-white py-3.5 rounded-xl font-bold shadow-md shadow-green-200 active:scale-95 transition-transform"
-                            >
-                                <Check className="w-5 h-5 mr-2" /> 도착 완료
-                            </button>
-                        </div>
+                    {/* SOS 버튼 */}
+                    <div className="flex flex-col items-center justify-center relative flex-grow -mt-4">
+                        <button
+                            onMouseDown={startSOS} 
+                            onMouseUp={endSOS} 
+                            onMouseLeave={endSOS}
+                            onTouchStart={startSOS} 
+                            onTouchEnd={endSOS}
+                            className={`w-24 h-24 rounded-full flex flex-col items-center justify-center text-white shadow-xl transition-all duration-200 
+                                ${isSOSPressed 
+                                    ? 'bg-red-700 scale-95 ring-8 ring-red-200' 
+                                    : 'bg-red-500 hover:bg-red-600 ring-4 ring-red-100 animate-pulse'}`}
+                        >
+                            <AlertTriangle className="w-8 h-8 mb-1" />
+                            <span className="text-xl font-black tracking-widest">SOS</span>
+                        </button>
+                        
+                        {isSOSPressed && (
+                            <div className="absolute top-0 right-10 bg-gray-800 text-white text-xs px-2 py-1 rounded animate-bounce">
+                                전송 중...
+                            </div>
+                        )}
+                        <p className="text-[10px] text-gray-400 mt-2">위급 시 2초간 꾹 눌러주세요</p>
+                    </div>
+
+                    {/* 하단 버튼 2개 */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-3.5 rounded-xl font-bold shadow-sm active:scale-95 transition-transform">
+                            <Phone className="w-5 h-5 mr-2 text-gray-500" /> 112 신고
+                        </a>
+                        <button 
+                            onClick={() => { 
+                                if(watchId.current) navigator.geolocation.clearWatch(watchId.current);
+                                toast.success("안전하게 도착했습니다!"); 
+                                navigate('/'); 
+                            }}
+                            className="flex items-center justify-center bg-green-500 text-white py-3.5 rounded-xl font-bold shadow-md shadow-green-200 active:scale-95 transition-transform"
+                        >
+                            <Check className="w-5 h-5 mr-2" /> 도착 완료
+                        </button>
                     </div>
                 </div>
             </div>
