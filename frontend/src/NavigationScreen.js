@@ -42,8 +42,11 @@ export default function NavigationScreen({ userUid: propUserUid }) {
     const watchId = useRef(null);
     const [debugMsg, setDebugMsg] = useState("");
 
-    // 시트 상태
+    // 시트 열림/닫힘 상태
     const [isSheetOpen, setIsSheetOpen] = useState(true);
+
+    // 🚨 손잡이 높이 상수 (고정값)
+    const HANDLE_HEIGHT = 60;
 
     // 1. 긴급 연락처 로드
     useEffect(() => {
@@ -57,19 +60,18 @@ export default function NavigationScreen({ userUid: propUserUid }) {
         fetchContacts();
     }, [userUid]);
 
-    // 2. 거리 계산
-    const getDistance = (lat1, lng1, lat2, lng2) => {
-        if (!lat1 || !lng1 || !lat2 || !lng2) return Infinity;
-        const R = 6371e3;
-        const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
-        const Δφ = (lat2 - lat1) * Math.PI / 180, Δλ = (lng2 - lng1) * Math.PI / 180;
-        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    };
-
-    // 3. 위치 추적
+    // 2. 거리 계산 및 위치 추적
     useEffect(() => {
         if (!path || path.length < 2 || !navigator.geolocation) return;
+
+        const getDistance = (lat1, lng1, lat2, lng2) => {
+            if (!lat1 || !lng1 || !lat2 || !lng2) return Infinity;
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180, Δλ = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        };
 
         const minutes = parseInt(routeInfo?.time?.replace(/[^0-9]/g, '')) || 0;
         const now = new Date();
@@ -95,7 +97,9 @@ export default function NavigationScreen({ userUid: propUserUid }) {
 
                 const remainingRatio = Math.max(0, (path.length - minIdx) / path.length);
                 const leftMin = Math.ceil(minutes * remainingRatio);
-                setRemainingTimeStr(leftMin > 0 ? `${leftMin}분` : "곧 도착");
+                const newRemainingTimeStr = leftMin > 0 ? `${leftMin}분` : "곧 도착";
+                
+                setRemainingTimeStr(newRemainingTimeStr);
 
                 const endPos = path[path.length - 1];
                 if (getDistance(newLat, newLng, endPos.lat, endPos.lng) < 30) {
@@ -143,14 +147,10 @@ export default function NavigationScreen({ userUid: propUserUid }) {
 
     if (!path) return <div className="flex justify-center items-center h-screen">로딩중...</div>;
 
-    // 🚨 핵심 수정: 시트 높이를 고정값(500px)으로 잡되, 
-    // 닫힐 때 '100% - 70px' 만큼만 내려가도록 CSS 계산식(calc) 사용
-    const SHEET_HEIGHT = '550px'; 
-
     return (
         <div className="fixed inset-0 bg-gray-100 font-sans overflow-hidden">
             
-            {/* 1. 지도 */}
+            {/* 1. 지도 (전체 화면) */}
             <div className="absolute inset-0 z-0">
                 <Map center={currentPos || path[0]} style={{ width: "100%", height: "100%" }} level={3} appkey={KAKAO_APP_KEY} onCreate={setMap}>
                     <MapMarker position={path[0]} image={MARKER_IMGS.start} />
@@ -179,8 +179,8 @@ export default function NavigationScreen({ userUid: propUserUid }) {
             <div 
                 className="absolute left-4 right-4 z-20 transition-all duration-300 ease-in-out"
                 style={{ 
-                    // 시트가 열리면 위로(560px), 닫히면 바닥에서 90px 위로 (손잡이 안 가리게)
-                    bottom: isSheetOpen ? '570px' : '90px' 
+                    // 🚨 열렸을 땐 시트 내용물 위(약 400px), 닫혔을 땐 손잡이 위(80px)
+                    bottom: isSheetOpen ? '400px' : `${HANDLE_HEIGHT + 20}px` 
                 }}
             >
                 <div className="bg-white rounded-3xl shadow-xl p-5 flex items-center justify-between border border-gray-100">
@@ -201,29 +201,30 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </div>
             </div>
 
-            {/* 3. 슬라이딩 바텀 시트 */}
+            {/* 3. 슬라이딩 바텀 시트 (높이 자동 & 간격 좁힘) */}
             <div 
                 className="fixed left-0 right-0 z-30 bg-white rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-in-out"
                 style={{ 
                     bottom: 0,
-                    height: SHEET_HEIGHT,
-                    // 🚨 열리면 0, 닫히면 전체 높이에서 70px(손잡이)만 빼고 다 내려감
-                    transform: isSheetOpen ? 'translateY(0)' : `translateY(calc(100% - 70px))`
+                    height: 'auto',      // 🚨 높이를 내용물에 맞게 자동 조절
+                    maxHeight: '80vh',   // 너무 커지지 않게 제한
+                    // 🚨 핵심: 닫힐 때 '전체 높이 - 손잡이 높이' 만큼만 내려감 (손잡이 보장)
+                    transform: isSheetOpen ? 'translateY(0)' : `translateY(calc(100% - ${HANDLE_HEIGHT}px))`
                 }}
             >
-                {/* 핸들 (터치 영역 확대) */}
+                {/* 핸들 */}
                 <div 
                     onClick={() => setIsSheetOpen(!isSheetOpen)}
-                    className="w-full h-[60px] flex items-center justify-center cursor-pointer active:bg-gray-50 rounded-t-[2.5rem]"
+                    className={`w-full h-[${HANDLE_HEIGHT}px] flex items-center justify-center cursor-pointer active:bg-gray-50 rounded-t-[2.5rem]`}
                 >
                     <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
                 </div>
 
-                {/* 내용물 (스크롤 없이 꽉 차게, 하단 패딩 넉넉히) */}
-                <div className="px-6 flex flex-col justify-between h-[calc(100%-60px)] pb-12">
+                {/* 내용물 컨테이너 (하단 패딩 넉넉히 주어 버튼 잘림 방지) */}
+                <div className="px-6 pb-8">
                     
-                    {/* 보호자 모니터링 */}
-                    <div className="bg-blue-50/80 p-4 rounded-2xl flex items-center justify-between border border-blue-100">
+                    {/* 보호자 모니터링 (간격 좁힘: mb-4 -> mb-2) */}
+                    <div className="bg-blue-50/80 p-4 rounded-2xl flex items-center justify-between border border-blue-100 mb-2">
                         <div className="flex items-center text-sm font-bold text-gray-700">
                             <Eye className="w-4 h-4 mr-2 text-green-500 animate-pulse" /> 
                             안심 귀가 모니터링 중
@@ -241,8 +242,8 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                         </div>
                     </div>
 
-                    {/* SOS 버튼 */}
-                    <div className="flex flex-col items-center justify-center relative flex-grow py-4">
+                    {/* SOS 버튼 (간격 좁힘: py-4 -> py-2, mb-2 추가) */}
+                    <div className="flex flex-col items-center justify-center relative py-2 mb-2">
                         <button
                             onMouseDown={startSOS} 
                             onMouseUp={endSOS} 
@@ -263,10 +264,10 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                                 전송 중...
                             </div>
                         )}
-                        <p className="text-[10px] text-gray-400 mt-4">위급 시 2초간 꾹 눌러주세요</p>
+                        <p className="text-[10px] text-gray-400 mt-2">위급 시 2초간 꾹 눌러주세요</p>
                     </div>
 
-                    {/* 하단 버튼 2개 (바닥에서 띄워서 잘림 방지) */}
+                    {/* 하단 버튼 2개 */}
                     <div className="grid grid-cols-2 gap-3">
                         <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-4 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform">
                             <Phone className="w-5 h-5 mr-2 text-gray-500" /> 112 신고
