@@ -43,7 +43,7 @@ export default function NavigationScreen({ userUid }) {
     const [arrivalTimeStr, setArrivalTimeStr] = useState("");
     
     // 🚨 SOS 버튼 상태 (꾹 누르기용)
-    const [isSOSPressed, setIsSOSPressed] = useState(false);
+    const [isSOSPressed, setIsSOSPressed] = useState([]);
     const sosTimerRef = useRef(null); // 타이머 저장
 
     const [contacts, setContacts] = useState([]); 
