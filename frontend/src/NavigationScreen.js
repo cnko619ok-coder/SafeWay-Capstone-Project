@@ -34,7 +34,6 @@ export default function NavigationScreen({ userUid: propUserUid }) {
     const [currentPos, setCurrentPos] = useState(path ? path[0] : null); 
     const [passedPath, setPassedPath] = useState([]);
     const [remainPath, setRemainPath] = useState(path || []);
-    // 🚨 초기값 안전하게 설정
     const [remainingTimeStr, setRemainingTimeStr] = useState(routeInfo?.time || "계산중");
     const [arrivalTimeStr, setArrivalTimeStr] = useState("");
     const [isSOSPressed, setIsSOSPressed] = useState(false);
@@ -42,15 +41,14 @@ export default function NavigationScreen({ userUid: propUserUid }) {
     const [contacts, setContacts] = useState([]);
     const watchId = useRef(null);
 
-    // 시트 상태 (기본 열림)
     const [isSheetOpen, setIsSheetOpen] = useState(true);
 
-    // 🚨🚨🚨 [높이 및 간격 고정 상수] 🚨🚨🚨
-    const SHEET_HEIGHT = 400; // 시트 열렸을 때 전체 높이 (넉넉하게)
-    const HANDLE_HEIGHT = 40; // 닫혔을 때 남을 손잡이 높이
-    const GAP = 15;           // 시간창과 시트 사이의 간격
+    // 🚨🚨🚨 [최종 수정: 컴팩트한 높이와 안전한 간격] 🚨🚨🚨
+    const SHEET_HEIGHT = 330; // 전체 높이를 330px로 줄임 (잘림 방지)
+    const HANDLE_HEIGHT = 45; // 손잡이 높이
+    const GAP = 10;           // 시간창과 시트 사이 간격
     
-    // 닫힐 때 시트가 내려갈 거리 (400 - 40 = 360px)
+    // 닫힐 때 내려갈 거리 (330 - 45 = 285px)
     const SHEET_TRANSLATE = SHEET_HEIGHT - HANDLE_HEIGHT; 
 
     // 1. 긴급 연락처 로드
@@ -180,16 +178,15 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </button>
             </div>
 
-            {/* 🚨🚨🚨 2. 시간 정보 카드 (독립적이지만 시트와 동기화됨) 🚨🚨🚨 */}
+            {/* 🚨🚨🚨 2. 시간 정보 카드 (위치 정확하게 계산됨) 🚨🚨🚨 */}
             <div 
                 className="absolute left-4 right-4 z-40 transition-all duration-300 ease-in-out"
                 style={{ 
-                    // 열림: 시트높이(400) + 간격(15) = 415px 위치
-                    // 닫힘: 손잡이높이(40) + 간격(15) = 55px 위치 (절대 안 잘림!)
+                    // 열림: 시트높이(330) + 간격(10) = 340px 위치
+                    // 닫힘: 손잡이높이(45) + 간격(10) = 55px 위치 (절대 안 잘림!)
                     bottom: isSheetOpen ? `${SHEET_HEIGHT + GAP}px` : `${HANDLE_HEIGHT + GAP}px` 
                 }}
             >
-                {/* 시간창을 눌러도 시트가 열리고 닫히게 설정 */}
                 <div 
                     onClick={() => setIsSheetOpen(!isSheetOpen)}
                     className="bg-white rounded-3xl shadow-xl p-4 flex items-center justify-between border border-gray-100 cursor-pointer active:scale-[0.99] transition-transform"
@@ -197,12 +194,10 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                     <div>
                         <p className="text-xs font-bold text-gray-400 mb-1">남은 시간</p>
                         <p className="text-3xl font-black text-blue-600 tracking-tighter">
-                            {/* 안전한 데이터 접근 */}
                             {remainingTimeStr?.replace(/[^0-9]/g, '') || '0'}
                             <span className="text-lg ml-1 text-blue-500 font-bold">분</span>
                         </p>
                     </div>
-                    {/* 열림/닫힘 상태 표시 아이콘 */}
                     <div className="opacity-30">
                         {isSheetOpen ? <ChevronDown className="w-5 h-5"/> : <ChevronUp className="w-5 h-5"/>}
                     </div>
@@ -215,29 +210,28 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </div>
             </div>
 
-            {/* 🚨🚨🚨 3. 하단 SOS 시트 (고정 높이 + 넉넉한 패딩) 🚨🚨🚨 */}
+            {/* 🚨🚨🚨 3. 하단 SOS 시트 (컴팩트 + 초밀착 + 안전 패딩) 🚨🚨🚨 */}
             <div 
                 className="fixed left-0 right-0 bottom-0 z-50 bg-white rounded-t-[2.5rem] shadow-[0_-5px_30px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-in-out"
                 style={{ 
-                    height: `${SHEET_HEIGHT}px`, // 400px 고정! (버튼 공간 충분)
-                    // 열리면 0, 닫히면 360px 내려가서 손잡이 40px만 남음
+                    height: `${SHEET_HEIGHT}px`, // 330px 고정!
                     transform: isSheetOpen ? 'translateY(0)' : `translateY(${SHEET_TRANSLATE}px)`
                 }}
             >
                 {/* 핸들 (터치 영역) */}
                 <div 
                     onClick={() => setIsSheetOpen(!isSheetOpen)}
-                    className="w-full h-[40px] flex items-center justify-center cursor-pointer active:bg-gray-50 rounded-t-[2.5rem] absolute top-0 left-0 right-0 z-10"
+                    className="w-full h-[45px] flex items-center justify-center cursor-pointer active:bg-gray-50 rounded-t-[2.5rem] absolute top-0 left-0 right-0 z-10"
                 >
                     <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
                 </div>
 
                 {/* 내용물 컨테이너 */}
-                {/* 🚨 pb-10: 하단 패딩을 넉넉히 주어 버튼 잘림 방지! */}
-                <div className="mt-[40px] px-6 pb-10 flex flex-col justify-between h-[calc(100%-40px)]">
+                {/* 🚨 핵심: pb-14로 하단 여백을 아주 넉넉히 주어 버튼 잘림 완벽 방지 */}
+                <div className="mt-[45px] px-6 pb-14 flex flex-col h-[calc(100%-45px)]">
                     
                     {/* 보호자 모니터링 */}
-                    <div className="bg-blue-50/80 p-3 rounded-2xl flex items-center justify-between border border-blue-100 mt-2">
+                    <div className="bg-blue-50/80 p-3 rounded-2xl flex items-center justify-between border border-blue-100 mb-2 flex-shrink-0">
                         <div className="flex items-center text-sm font-bold text-gray-700">
                             <Eye className="w-4 h-4 mr-2 text-green-500 animate-pulse" /> 
                             안심 귀가 모니터링 중
@@ -255,46 +249,50 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                         </div>
                     </div>
 
-                    {/* SOS 버튼 (중앙) */}
-                    <div className="flex flex-col items-center justify-center relative flex-grow -mt-4">
-                        <button
-                            onMouseDown={startSOS} 
-                            onMouseUp={endSOS} 
-                            onMouseLeave={endSOS}
-                            onTouchStart={startSOS} 
-                            onTouchEnd={endSOS}
-                            className={`w-28 h-28 rounded-full flex flex-col items-center justify-center text-white shadow-xl transition-all duration-200 
-                                ${isSOSPressed 
-                                    ? 'bg-red-700 scale-95 ring-8 ring-red-200' 
-                                    : 'bg-red-500 hover:bg-red-600 ring-4 ring-red-100 animate-pulse'}`}
-                        >
-                            <AlertTriangle className="w-10 h-10 mb-1" />
-                            <span className="text-xl font-black tracking-widest">SOS</span>
-                        </button>
+                    {/* 🚨 핵심: flex-grow와 gap-2를 사용하여 요소들을 가깝게 밀착시킴 */}
+                    <div className="flex flex-col justify-end flex-grow gap-2">
                         
-                        {isSOSPressed && (
-                            <div className="absolute top-0 right-8 bg-gray-800 text-white text-xs px-2 py-1 rounded animate-bounce">
-                                전송 중...
-                            </div>
-                        )}
-                        <p className="text-[10px] text-gray-400 mt-3">위급 시 2초간 꾹 눌러주세요</p>
-                    </div>
+                        {/* SOS 버튼 (중앙) */}
+                        <div className="flex flex-col items-center justify-center relative">
+                            <button
+                                onMouseDown={startSOS} 
+                                onMouseUp={endSOS} 
+                                onMouseLeave={endSOS}
+                                onTouchStart={startSOS} 
+                                onTouchEnd={endSOS}
+                                className={`w-24 h-24 rounded-full flex flex-col items-center justify-center text-white shadow-xl transition-all duration-200 
+                                    ${isSOSPressed 
+                                        ? 'bg-red-700 scale-95 ring-8 ring-red-200' 
+                                        : 'bg-red-500 hover:bg-red-600 ring-4 ring-red-100 animate-pulse'}`}
+                            >
+                                <AlertTriangle className="w-8 h-8 mb-1" />
+                                <span className="text-xl font-black tracking-widest">SOS</span>
+                            </button>
+                            
+                            {isSOSPressed && (
+                                <div className="absolute top-0 right-10 bg-gray-800 text-white text-xs px-2 py-1 rounded animate-bounce">
+                                    전송 중...
+                                </div>
+                            )}
+                            <p className="text-[10px] text-gray-400 mt-2">위급 시 2초간 꾹 눌러주세요</p>
+                        </div>
 
-                    {/* 하단 버튼 2개 */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-3.5 rounded-xl font-bold shadow-sm active:scale-95 transition-transform text-sm">
-                            <Phone className="w-5 h-5 mr-2 text-gray-500" /> 112 신고
-                        </a>
-                        <button 
-                            onClick={() => { 
-                                if(watchId.current) navigator.geolocation.clearWatch(watchId.current);
-                                toast.success("안전하게 도착했습니다!"); 
-                                navigate('/'); 
-                            }}
-                            className="flex items-center justify-center bg-green-500 text-white py-3.5 rounded-xl font-bold shadow-md shadow-green-200 active:scale-95 transition-transform text-sm"
-                        >
-                            <Check className="w-5 h-5 mr-2" /> 도착 완료
-                        </button>
+                        {/* 하단 버튼 2개 (SOS 버튼과 아주 가깝게 배치) */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-3.5 rounded-xl font-bold shadow-sm active:scale-95 transition-transform text-sm">
+                                <Phone className="w-5 h-5 mr-2 text-gray-500" /> 112 신고
+                            </a>
+                            <button 
+                                onClick={() => { 
+                                    if(watchId.current) navigator.geolocation.clearWatch(watchId.current);
+                                    toast.success("안전하게 도착했습니다!"); 
+                                    navigate('/'); 
+                                }}
+                                className="flex items-center justify-center bg-green-500 text-white py-3.5 rounded-xl font-bold shadow-md shadow-green-200 active:scale-95 transition-transform text-sm"
+                            >
+                                <Check className="w-5 h-5 mr-2" /> 도착 완료
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
