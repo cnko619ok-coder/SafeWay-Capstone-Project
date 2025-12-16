@@ -3,14 +3,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Map, MapMarker, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk';
-import { Phone, Check, AlertTriangle, Eye, ArrowLeft } from 'lucide-react'; 
+import { Phone, Check, AlertTriangle, Eye, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
 const KAKAO_APP_KEY = 'e8757f3638207e014bcea23f202b11d8'; 
+
+// 🚨🚨🚨 [매우 중요] 이 주소가 MainScreen.js와 똑같은지 꼭 확인하세요! 🚨🚨🚨
 const API_BASE_URL = 'https://ester-idealess-ceremonially.ngrok-free.dev'; 
 
-// 마커 이미지 설정
 const MARKER_IMGS = {
     start: {
         src: "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png", 
@@ -24,6 +25,7 @@ const MARKER_IMGS = {
     }
 };
 
+// 🚨 함수 안에 '{ userUid }'가 꼭 있어야 합니다!
 export default function NavigationScreen({ userUid }) {
     const location = useLocation();
     const navigate = useNavigate();
@@ -34,29 +36,39 @@ export default function NavigationScreen({ userUid }) {
     const [map, setMap] = useState(null);
     const [currentPos, setCurrentPos] = useState(path ? path[0] : null); 
     
-    // 경로 상태
     const [passedPath, setPassedPath] = useState([]);
     const [remainPath, setRemainPath] = useState(path || []);
     
-    // 시간 정보
     const [remainingTimeStr, setRemainingTimeStr] = useState(routeInfo?.time || "계산중");
     const [arrivalTimeStr, setArrivalTimeStr] = useState("");
     
-    // 🚨 SOS 버튼 상태 (꾹 누르기용)
-    const [isSOSPressed, setIsSOSPressed] = useState([]);
-    const sosTimerRef = useRef(null); // 타이머 저장
+    const [isSOSPressed, setIsSOSPressed] = useState(false);
+    const sosTimerRef = useRef(null);
 
-    const [contacts, setContacts] = useState([]); 
+    // 긴급 연락처 상태
+    const [contacts, setContacts] = useState([]);
     const watchId = useRef(null);
 
-    // 1. 긴급 연락처 불러오기
+    // 🚨 1. 긴급 연락처 불러오기 (로그 추가됨)
     useEffect(() => {
+        // userUid가 잘 들어왔는지 콘솔에 찍어봅니다.
+        console.log("📍 [NavigationScreen] 전달받은 userUid:", userUid);
+
         const fetchContacts = async () => {
-            if (!userUid) return;
+            if (!userUid) {
+                console.warn("⚠️ userUid가 없어서 연락처를 못 가져옵니다.");
+                return;
+            }
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/contacts/${userUid}`);
+                const url = `${API_BASE_URL}/api/contacts/${userUid}`;
+                console.log("🌐 연락처 요청 주소:", url); // 주소 확인용
+
+                const res = await axios.get(url);
                 setContacts(res.data);
-            } catch (e) { console.error("연락처 로드 실패:", e); }
+                console.log("✅ 불러온 연락처 개수:", res.data.length);
+            } catch (e) { 
+                console.error("❌ 연락처 로드 실패 (서버 주소를 확인하세요):", e); 
+            }
         };
         fetchContacts();
     }, [userUid]);
@@ -71,7 +83,7 @@ export default function NavigationScreen({ userUid }) {
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
-    // 3. 위치 추적 및 경로 업데이트
+    // 3. 위치 추적 및 경로 로직
     useEffect(() => {
         if (!path || path.length < 2 || !navigator.geolocation) return;
 
@@ -88,7 +100,6 @@ export default function NavigationScreen({ userUid }) {
 
                 setCurrentPos(newPos);
                 
-                // 경로 매칭 및 자르기
                 let minIdx = 0;
                 let minDist = Infinity;
                 path.forEach((p, i) => {
@@ -102,12 +113,10 @@ export default function NavigationScreen({ userUid }) {
                 const remain = path.slice(minIdx);
                 setRemainPath(remain);
 
-                // 남은 시간 갱신
                 const remainingRatio = Math.max(0, (path.length - minIdx) / path.length);
                 const leftMin = Math.ceil(totalMinutes * remainingRatio);
                 setRemainingTimeStr(leftMin > 0 ? `${leftMin}분` : "곧 도착");
 
-                // 도착 판정
                 const endPos = path[path.length - 1];
                 if (getDistance(newLat, newLng, endPos.lat, endPos.lng) < 30) {
                     toast.success("목적지에 도착했습니다! 🎉");
@@ -124,34 +133,32 @@ export default function NavigationScreen({ userUid }) {
     }, [path, map, routeInfo, navigate]);
 
 
-    // 🚨🚨🚨 [수정됨] SOS 꾹 누르기 핸들러 (112 전화 연결 X, 오직 문자만) 🚨🚨🚨
+    // 🚨 SOS 버튼 로직 (연락처 체크 강화)
     const startSOS = () => {
         setIsSOSPressed(true);
 
-        // 2초 타이머 시작
         sosTimerRef.current = setTimeout(() => {
-            triggerSOSAction(); // 2초 후 문자 발송 실행
+            triggerSOSAction();
             setIsSOSPressed(false);
         }, 2000);
     };
 
     const endSOS = () => {
-        // 2초 전에 떼면 취소
         if (sosTimerRef.current) {
             clearTimeout(sosTimerRef.current);
             setIsSOSPressed(false);
         }
     };
 
-    // 실제 문자 발송 함수
     const triggerSOSAction = () => {
-        // 연락처가 없는 경우 경고만 표시 (112로 넘어가지 않음)
+        // 로그를 찍어봅니다.
+        console.log("🚨 SOS 발동! 현재 연락처 목록:", contacts);
+
         if (contacts.length === 0) {
-            toast.error("등록된 보호자가 없습니다. 하단의 112 버튼을 이용해주세요.");
+            toast.error("연락처를 불러오지 못했습니다. (서버 연결 확인 필요)");
             return;
         }
 
-        // 연락처가 있으면 문자 발송
         const phoneNumbers = contacts.map(c => c.phone).join(',');
         const message = `[SafeWay 긴급] SOS! 도와주세요! 현재 경로 이동 중 위험 상황입니다.\n위치: https://map.kakao.com/link/map/${currentPos?.lat},${currentPos?.lng}`;
         
@@ -167,7 +174,7 @@ export default function NavigationScreen({ userUid }) {
     return (
         <div className="min-h-screen bg-white flex flex-col font-sans relative">
             
-            {/* 상단 정보 */}
+            {/* 상단바 */}
             <div className="absolute top-0 left-0 right-0 z-20 p-4 pt-12 pointer-events-none">
                 <div className="flex items-center justify-between pointer-events-auto">
                     <button onClick={() => navigate(-1)} className="bg-white p-3 rounded-full shadow-lg text-gray-700 hover:bg-gray-50 transition active:scale-95">
@@ -182,7 +189,7 @@ export default function NavigationScreen({ userUid }) {
                 </div>
             </div>
 
-            {/* 지도 영역 */}
+            {/* 지도 */}
             <div className="h-[65vh] w-full relative">
                 <Map center={currentPos || path[0]} style={{ width: "100%", height: "100%" }} level={3} appkey={KAKAO_APP_KEY} onCreate={setMap}>
                     <MapMarker position={path[0]} image={MARKER_IMGS.start} title="출발" />
@@ -201,6 +208,7 @@ export default function NavigationScreen({ userUid }) {
                     <Polyline path={[remainPath]} strokeWeight={9} strokeColor={"#2563eb"} strokeOpacity={1} strokeStyle={"solid"} />
                 </Map>
 
+                {/* 범례 */}
                 <div className="absolute bottom-6 left-4 bg-white/90 backdrop-blur p-2.5 rounded-xl shadow-lg z-10 text-xs font-bold text-gray-600 space-y-1.5 border border-gray-100">
                     <div className="flex items-center"><div className="w-8 h-1.5 bg-[#2563eb] rounded mr-2"></div>남은 경로</div>
                     <div className="flex items-center"><div className="w-8 h-1.5 bg-[#cbd5e1] rounded mr-2"></div>지나온 길</div>
@@ -229,7 +237,7 @@ export default function NavigationScreen({ userUid }) {
                     </div>
                 </div>
 
-                {/* 🚨 SOS 버튼 (꾹 누르기 + 문자 전송만 작동) */}
+                {/* SOS 버튼 */}
                 <div className="flex-1 flex flex-col items-center justify-center w-full mb-4 relative">
                     <button
                         onMouseDown={startSOS} 
@@ -247,7 +255,6 @@ export default function NavigationScreen({ userUid }) {
                     </button>
                     <p className="text-xs text-gray-400 mt-4 font-medium">위급 시 2초간 꾹 눌러주세요</p>
                     
-                    {/* 누르는 중일 때 툴팁 표시 */}
                     {isSOSPressed && (
                         <div className="absolute top-0 right-10 bg-gray-800 text-white text-xs px-2 py-1 rounded">
                             전송 중...
@@ -255,7 +262,7 @@ export default function NavigationScreen({ userUid }) {
                     )}
                 </div>
 
-                {/* 하단 버튼들 (112 신고 버튼은 여기에 따로 있음) */}
+                {/* 하단 버튼들 */}
                 <div className="w-full grid grid-cols-2 gap-3">
                     <a href="tel:112" className="flex items-center justify-center bg-white border border-gray-200 text-gray-600 py-3.5 rounded-xl font-bold shadow-sm hover:bg-gray-50">
                         <Phone className="w-4 h-4 mr-2" /> 112 신고
