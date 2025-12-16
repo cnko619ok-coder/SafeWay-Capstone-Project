@@ -43,15 +43,10 @@ export default function NavigationScreen({ userUid: propUserUid }) {
 
     const [isSheetOpen, setIsSheetOpen] = useState(true);
 
-    // 🚨🚨🚨 [위치 및 크기 재조정] 🚨🚨🚨
-    // SOS 버튼이 커졌으므로 시트 높이도 살짝 늘림
-    const SHEET_HEIGHT = 480; 
-    
-    // 닫혔을 때 시간창 높이 (100px로 올려서 절대 안 잘리게 함)
-    const CLOSED_POS = 100; 
-    
-    // 열렸을 때 시간창 높이
-    const OPEN_POS = SHEET_HEIGHT + 15;
+    // 🚨🚨🚨 [설정값 유지] 🚨🚨🚨
+    const SHEET_HEIGHT = 460; // 버튼들이 넉넉히 들어가도록 높이 확보
+    const CLOSED_POS = 100;   // 닫혔을 때 시간창 위치 (잘 보임)
+    const OPEN_POS = SHEET_HEIGHT + 15; // 열렸을 때 시간창 위치
 
     // 1. 긴급 연락처 로드
     useEffect(() => {
@@ -179,11 +174,10 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </button>
             </div>
 
-            {/* 🚨🚨🚨 2. 시간 정보 카드 (높이 상향 조정) 🚨🚨🚨 */}
+            {/* 2. 시간 정보 카드 (유지) */}
             <div 
                 className="fixed left-4 right-4 z-50 transition-all duration-300 ease-in-out"
                 style={{ 
-                    // 닫히면 바닥에서 100px 위로 띄웁니다! (이제 안 잘림)
                     bottom: isSheetOpen ? `${OPEN_POS}px` : `${CLOSED_POS}px` 
                 }}
             >
@@ -210,7 +204,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </div>
             </div>
 
-            {/* 🚨🚨🚨 3. 하단 SOS 시트 (버튼 확대 + 여백 확보) 🚨🚨🚨 */}
+            {/* 3. 하단 SOS 시트 (간격 다이어트 적용) */}
             <div 
                 className={`fixed left-0 right-0 bottom-0 z-40 bg-white rounded-t-[2.5rem] shadow-[0_-5px_30px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-in-out
                 ${isSheetOpen ? 'translate-y-0' : 'translate-y-[120%]'}`} 
@@ -224,11 +218,11 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                     <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
                 </div>
 
-                {/* 내용물 컨테이너 (하단 여백 pb-12) */}
+                {/* 내용물 컨테이너 (하단 여백 넉넉히) */}
                 <div className="pt-[30px] px-6 pb-12 flex flex-col justify-between h-full">
                     
-                    {/* 보호자 모니터링 */}
-                    <div className="bg-blue-50/80 px-4 py-3 rounded-xl flex items-center justify-between border border-blue-100 mb-2">
+                    {/* 🚨 [수정 1] 보호자 모니터링 (패딩 줄여서 공간 확보) */}
+                    <div className="bg-blue-50/80 px-4 py-2 rounded-xl flex items-center justify-between border border-blue-100 flex-shrink-0">
                         <div className="flex items-center text-xs font-bold text-gray-700">
                             <Eye className="w-3 h-3 mr-2 text-green-500 animate-pulse" /> 
                             안심 귀가 모니터링 중
@@ -246,14 +240,15 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                         </div>
                     </div>
 
-                    {/* SOS 버튼 (🚨 크기 확대: w-32 h-32) */}
-                    <div className="flex flex-col items-center justify-center relative flex-grow">
+                    {/* 🚨 [수정 2] SOS 버튼 (위아래 여백 제거하여 당김) */}
+                    <div className="flex flex-col items-center justify-center relative flex-grow -mt-2">
                         <button
                             onMouseDown={startSOS} 
                             onMouseUp={endSOS} 
                             onMouseLeave={endSOS}
                             onTouchStart={startSOS} 
                             onTouchEnd={endSOS}
+                            // 버튼 크기 유지 (w-32 h-32)
                             className={`w-32 h-32 rounded-full flex flex-col items-center justify-center text-white shadow-xl transition-all duration-200 
                                 ${isSOSPressed 
                                     ? 'bg-red-700 scale-95 ring-8 ring-red-200' 
@@ -268,11 +263,12 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                                 전송 중...
                             </div>
                         )}
-                        <p className="text-[10px] text-gray-400 mt-2">위급 시 2초간 꾹</p>
+                        {/* 텍스트 간격 좁힘 */}
+                        <p className="text-[10px] text-gray-400 mt-1">위급 시 2초간 꾹</p>
                     </div>
 
-                    {/* 하단 버튼 2개 */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* 🚨 [수정 3] 하단 버튼 (높이 약간 줄임: py-3.5) */}
+                    <div className="grid grid-cols-2 gap-3 flex-shrink-0">
                         <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-3.5 rounded-xl font-bold shadow-sm active:scale-95 transition-transform text-sm">
                             <Phone className="w-4 h-4 mr-2 text-gray-500" /> 112 신고
                         </a>
