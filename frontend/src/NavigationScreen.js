@@ -146,7 +146,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
     return (
         <div className="fixed inset-0 bg-gray-100 font-sans overflow-hidden">
             
-            {/* 1. 지도 */}
+            {/* 1. 지도 (전체 화면) */}
             <div className="absolute inset-0 z-0">
                 <Map center={currentPos || path[0]} style={{ width: "100%", height: "100%" }} level={3} appkey={KAKAO_APP_KEY} onCreate={setMap}>
                     <MapMarker position={path[0]} image={MARKER_IMGS.start} />
@@ -164,62 +164,59 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </Map>
             </div>
 
-            {/* 상단 뒤로가기 */}
+            {/* 상단 뒤로가기 버튼 */}
             <div className="absolute top-4 left-4 z-20">
                 <button onClick={() => navigate(-1)} className="bg-white p-3 rounded-full shadow-md text-gray-700 active:scale-95">
                     <ArrowLeft className="w-6 h-6" />
                 </button>
             </div>
 
-            {/* 🚨🚨🚨 [일체형 엘리베이터 구조] 🚨🚨🚨 */}
-            {/* 이 컨테이너 하나가 시간창과 SOS창을 모두 담고 움직입니다. */}
+            {/* 🚨🚨🚨 통합 슬라이딩 시트 (완벽 수정) 🚨🚨🚨 */}
+            {/* z-50: 가장 위에 표시 / bottom-0: 바닥에 고정 */}
             <div 
-                className="fixed bottom-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out flex flex-col"
+                className={`fixed left-0 right-0 bottom-0 z-50 transition-transform duration-300 ease-in-out flex flex-col`}
                 style={{ 
-                    // 열리면: 원래 위치 (0)
-                    // 닫리면: SOS패널 높이만큼 내려감 (calc(100% - 130px))
-                    // 130px은 '시간창 높이 + 간격'으로, 닫혀도 이만큼은 무조건 보입니다.
-                    transform: isSheetOpen ? 'translateY(0)' : 'translateY(calc(100% - 130px))' 
+                    // 닫혔을 때는 "전체 높이 - 140px(헤더높이)" 만큼만 내려갑니다.
+                    // 140px은 시간창이 보여질 높이입니다. 절대 사라지지 않습니다.
+                    transform: isSheetOpen ? 'translateY(0)' : 'translateY(calc(100% - 140px))' 
                 }}
             >
-                {/* 1. 시간 정보 카드 (헤더 역할 - 절대 안 사라짐) */}
+                {/* 1️⃣ 헤더: 시간 정보 카드 (항상 보임) */}
+                {/* 배경을 투명하게 하고 카드만 띄워서 입체감을 줍니다 */}
                 <div 
                     onClick={() => setIsSheetOpen(!isSheetOpen)}
-                    className="mx-4 mb-2 bg-white rounded-3xl shadow-xl p-5 flex items-center justify-between border border-gray-100 cursor-pointer active:scale-[0.99] transition-transform"
-                    style={{ height: '110px' }} // 높이 고정
+                    className="w-full flex justify-center pb-2 cursor-pointer active:scale-[0.99] transition-transform"
+                    style={{ height: '140px' }} // 높이 고정
                 >
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 mb-1">남은 시간</p>
-                        <p className="text-4xl font-black text-blue-600 tracking-tighter">
-                            {remainingTimeStr.replace(/[^0-9]/g, '')}
-                            <span className="text-xl ml-1 text-blue-500 font-bold">분</span>
-                        </p>
-                    </div>
-                    
-                    {/* 접기/펴기 아이콘 */}
-                    <div className="flex flex-col items-center justify-center opacity-30">
-                        {isSheetOpen ? <ChevronDown className="w-6 h-6" /> : <ChevronUp className="w-6 h-6" />}
-                    </div>
+                    <div className="w-[92%] bg-white rounded-3xl shadow-2xl p-5 flex items-center justify-between border border-gray-100 relative top-4">
+                        <div>
+                            <p className="text-xs font-bold text-gray-400 mb-1">남은 시간</p>
+                            <p className="text-4xl font-black text-blue-600 tracking-tighter">
+                                {remainingTimeStr?.replace(/[^0-9]/g, '') || '0'}
+                                <span className="text-xl ml-1 text-blue-500 font-bold">분</span>
+                            </p>
+                        </div>
+                        
+                        {/* 아이콘 */}
+                        <div className="opacity-30">
+                            {isSheetOpen ? <ChevronDown className="w-6 h-6" /> : <ChevronUp className="w-6 h-6" />}
+                        </div>
 
-                    <div className="text-right">
-                        <p className="text-xs font-bold text-gray-400 mb-1">도착 예정</p>
-                        <p className="text-2xl font-bold text-gray-800 tracking-tight">
-                            {arrivalTimeStr}
-                        </p>
+                        <div className="text-right">
+                            <p className="text-xs font-bold text-gray-400 mb-1">도착 예정</p>
+                            <p className="text-2xl font-bold text-gray-800 tracking-tight">
+                                {arrivalTimeStr || '--:--'}
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                {/* 2. SOS 및 버튼 패널 (바디 역할) */}
-                <div className="bg-white rounded-t-[2.5rem] shadow-[0_-5px_30px_rgba(0,0,0,0.15)] pt-2">
+                {/* 2️⃣ 바디: SOS 및 버튼 패널 */}
+                <div className="bg-white rounded-t-[2.5rem] shadow-[0_-5px_30px_rgba(0,0,0,0.1)] -mt-6 pt-8 relative z-[-1]">
                     
-                    {/* 손잡이 (데코레이션) */}
-                    <div className="w-full flex justify-center pt-3 pb-1" onClick={() => setIsSheetOpen(!isSheetOpen)}>
-                        <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
-                    </div>
-
                     {/* 내용물 컨테이너 */}
-                    {/* 🚨 pb-10: 하단 여백을 넉넉히 주어 버튼이 바닥에 붙지 않게 띄움 */}
-                    <div className="px-6 pb-10 flex flex-col gap-4">
+                    {/* 🚨 핵심: pb-20 (80px) 여백으로 버튼을 위로 확 띄웁니다! */}
+                    <div className="px-6 pb-20 flex flex-col gap-3">
                         
                         {/* 보호자 모니터링 */}
                         <div className="bg-blue-50/80 p-3 rounded-2xl flex items-center justify-between border border-blue-100">
@@ -230,7 +227,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                             <div className="flex -space-x-2">
                                 {contacts.length > 0 ? (
                                     contacts.slice(0, 3).map((c, i) => (
-                                        <div key={i} className="w-8 h-8 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-xs font-bold text-blue-700 shadow-sm">
+                                        <div key={i} className="w-7 h-7 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-blue-700 shadow-sm">
                                             {c.name[0]}
                                         </div>
                                     ))
@@ -240,8 +237,8 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                             </div>
                         </div>
 
-                        {/* SOS 버튼 */}
-                        <div className="flex flex-col items-center justify-center relative py-2">
+                        {/* SOS 버튼 (중앙) */}
+                        <div className="flex flex-col items-center justify-center relative py-1">
                             <button
                                 onMouseDown={startSOS} 
                                 onMouseUp={endSOS} 
@@ -262,10 +259,10 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                                     전송 중...
                                 </div>
                             )}
-                            <p className="text-[10px] text-gray-400 mt-2">위급 시 2초간 꾹 눌러주세요</p>
+                            <p className="text-[10px] text-gray-400 mt-2">위급 시 2초간 꾹</p>
                         </div>
 
-                        {/* 하단 버튼 2개 */}
+                        {/* 하단 버튼 2개 (SOS 버튼과 가깝게) */}
                         <div className="grid grid-cols-2 gap-3">
                             <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-3.5 rounded-xl font-bold shadow-sm active:scale-95 transition-transform">
                                 <Phone className="w-5 h-5 mr-2 text-gray-500" /> 112 신고
@@ -281,8 +278,6 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                                 <Check className="w-5 h-5 mr-2" /> 도착 완료
                             </button>
                         </div>
-                        {/* 🚨 버튼 아래 안전 여백 추가 */}
-                        <div className="h-4"></div>
                     </div>
                 </div>
             </div>
