@@ -204,7 +204,7 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </div>
             </div>
 
-            {/* 3. 하단 SOS 시트 (중앙 정렬 적용) */}
+            {/* 3. 하단 SOS 시트 */}
             <div 
                 className={`fixed left-0 right-0 bottom-0 z-40 bg-white rounded-t-[2.5rem] shadow-[0_-5px_30px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-in-out
                 ${isSheetOpen ? 'translate-y-0' : 'translate-y-[120%]'}`} 
@@ -219,12 +219,12 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                 </div>
 
                 {/* 🚨 내용물 컨테이너 (핵심 수정) 🚨 */}
-                {/* justify-center: 전체 덩어리를 수직 중앙으로 정렬 */}
-                {/* 기존의 상하 패딩(pt-4, pb-12) 제거하고 약간의 안전 여백(py-6)만 적용 */}
-                <div className="px-6 py-6 flex flex-col h-full items-center justify-center">
+                {/* justify-center 제거. pt-10으로 상단 여백 확보. pb-14로 하단 안전 여백 확보. justify-start로 위에서부터 배치 */}
+                <div className="px-6 pt-10 pb-14 flex flex-col h-full items-center justify-start">
                     
                     {/* 보호자 모니터링 */}
-                    <div className="w-full bg-blue-50/80 px-4 py-3 rounded-xl flex items-center justify-between border border-blue-100 flex-shrink-0 mb-2">
+                    {/* 🚨 mb-6: SOS 버튼과의 간격을 넓힘 */}
+                    <div className="w-full bg-blue-50/80 px-4 py-3 rounded-xl flex items-center justify-between border border-blue-100 flex-shrink-0 mb-6">
                         <div className="flex items-center text-xs font-bold text-gray-700">
                             <Eye className="w-3 h-3 mr-2 text-green-500 animate-pulse" /> 
                             안심 귀가 모니터링 중
@@ -242,8 +242,9 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                         </div>
                     </div>
 
-                    {/* SOS 버튼 (밀착 상태 유지) */}
-                    <div className="flex flex-col items-center justify-center my-1">
+                    {/* SOS 버튼 */}
+                    {/* 불필요한 margin 제거 */}
+                    <div className="flex flex-col items-center justify-center">
                         <button
                             onMouseDown={startSOS} 
                             onMouseUp={endSOS} 
@@ -267,8 +268,9 @@ export default function NavigationScreen({ userUid: propUserUid }) {
                         <p className="text-[10px] text-gray-400 mt-1">위급 시 2초간 꾹</p>
                     </div>
 
-                    {/* 하단 버튼 (밀착 상태 유지) */}
-                    <div className="w-full grid grid-cols-2 gap-3 mt-3">
+                    {/* 하단 버튼 */}
+                    {/* 🚨 mt-8: SOS 버튼과의 간격을 넓힘 */}
+                    <div className="w-full grid grid-cols-2 gap-3 mt-8">
                         <a href="tel:112" className="flex items-center justify-center bg-gray-50 border border-gray-200 text-gray-600 py-3.5 rounded-xl font-bold shadow-sm active:scale-95 transition-transform text-sm">
                             <Phone className="w-4 h-4 mr-2 text-gray-500" /> 112 신고
                         </a>
