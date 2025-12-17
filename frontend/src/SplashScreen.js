@@ -139,15 +139,15 @@ export default function SplashScreen({ onFinish }) {
         className="absolute bottom-8 left-0 right-0 flex justify-center gap-8 px-12"
       >
         <div className="flex items-center gap-2 text-white/60 text-sm">
-          <Shield className="h-4 w-4" />
+          <Shield className="h-4 w-5" />
           <span>안전경로</span>
         </div>
         <div className="flex items-center gap-2 text-white/60 text-sm">
-          <MapPin className="h-4 w-4" />
+          <MapPin className="h-4 w-5" />
           <span>실시간추적</span>
         </div>
         <div className="flex items-center gap-2 text-white/60 text-sm">
-          <Heart className="h-4 w-4" />
+          <Heart className="h-4 w-5" />
           <span>긴급연락</span>
         </div>
       </motion.div>
