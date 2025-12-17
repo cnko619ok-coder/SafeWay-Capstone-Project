@@ -136,18 +136,23 @@ export default function SplashScreen({ onFinish }) {
         initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.8, duration: 0.6 }}
-        className="absolute bottom-8 left-0 right-0 flex justify-center gap-8 px-12"
+        className="absolute bottom-8 left-0 right-0 flex justify-center gap-3 px-2 w-full"
       >
-        <div className="flex items-center gap-2 text-white/60 text-sm">
-          <Shield className="h-4 w-5" />
+        {/* 1. 안전경로 */}
+        <div className="flex items-center gap-1 text-white/60 text-xs whitespace-nowrap">
+          <Shield className="h-4 w-4" />
           <span>안전경로</span>
         </div>
-        <div className="flex items-center gap-2 text-white/60 text-sm">
-          <MapPin className="h-4 w-5" />
+
+        {/* 2. 실시간추적 (위험공유) */}
+        <div className="flex items-center gap-1 text-white/60 text-xs whitespace-nowrap">
+          <MapPin className="h-4 w-4" />
           <span>실시간추적</span>
         </div>
-        <div className="flex items-center gap-2 text-white/60 text-sm">
-          <Heart className="h-4 w-5" />
+
+        {/* 3. 긴급연락 (SOS) */}
+        <div className="flex items-center gap-1 text-white/60 text-xs whitespace-nowrap">
+          <Heart className="h-4 w-4" />
           <span>긴급연락</span>
         </div>
       </motion.div>
